@@ -1,0 +1,5 @@
+{
+  "name": "Biz-Knowledge Sticky",
+  "description": "付箋スタイルの直感的な一般常識学習プラットフォーム。時事ニュースやローカル情報も提供。",
+  "requestFramePermissions": ["geolocation"]
+}
