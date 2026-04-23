@@ -123,26 +123,24 @@ export const Dashboard = ({ stats, onStartTimedQuiz, onStartRandomQuiz }: { stat
           </div>
         </div>
 
-        {showDetails && (
-          <div className="bg-blue-50/80 border border-blue-100 rounded-2xl p-5 shadow-sm">
-            <div className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-2">Recommended Action</div>
-            <p className="text-sm text-blue-900 leading-relaxed">{nextAction}</p>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button
-                onClick={onStartTimedQuiz}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-900 text-white text-sm font-bold hover:bg-gray-800 transition-colors"
-              >
-                <Timer size={14} /> 5分ドリル
-              </button>
-              <button
-                onClick={onStartRandomQuiz}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white text-gray-800 text-sm font-bold border border-gray-200 hover:bg-gray-50 transition-colors"
-              >
-                <Shuffle size={14} /> ランダム出題
-              </button>
-            </div>
+        <div className="bg-blue-50/80 border border-blue-100 rounded-2xl p-5 shadow-sm">
+          <div className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-2">Recommended Action</div>
+          <p className="text-sm text-blue-900 leading-relaxed">{nextAction}</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              onClick={onStartTimedQuiz}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-900 text-white text-sm font-bold hover:bg-gray-800 transition-colors"
+            >
+              <Timer size={14} /> 5分ドリル
+            </button>
+            <button
+              onClick={onStartRandomQuiz}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white text-gray-800 text-sm font-bold border border-gray-200 hover:bg-gray-50 transition-colors"
+            >
+              <Shuffle size={14} /> ランダム出題
+            </button>
           </div>
-        )}
+        </div>
 
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between mb-4">
