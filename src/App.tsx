@@ -19,6 +19,7 @@ import { QuizModule } from './components/QuizModule';
 import { TriviaModule } from './components/TriviaModule';
 import { LocalModule } from './components/LocalModule';
 import { NewsModule } from './components/NewsModule';
+import { QuizLaunchPreset } from './components/QuizModule';
 
 import { useUserStats } from './hooks/useUserStats';
 import { useCurrentTime } from './hooks/useCurrentTime';
@@ -28,6 +29,8 @@ export default function App() {
   const { stats, setStats, updateScore } = useUserStats();
   // 右側コンテンツで表示するモジュールのタブ状態。
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  // クイズ開始時のプリセット設定。
+  const [quizPreset, setQuizPreset] = useState<QuizLaunchPreset | null>(null);
   // ヘッダー表示用の現在時刻。
   const currentTime = useCurrentTime();
 
@@ -43,6 +46,16 @@ export default function App() {
   const activeItem = menuItems.find(item => item.id === activeTab) || menuItems[0];
   // ログイン連続日数更新時に一度だけ表示する演出。
   const [showStreakAnim, setShowStreakAnim] = useState(false);
+
+  const startTimedQuiz = () => {
+    setQuizPreset({ sourceMode: 'category', endMode: 'time', durationMinutes: 5, category: 'english' });
+    setActiveTab('learning');
+  };
+
+  const startRandomQuiz = () => {
+    setQuizPreset({ sourceMode: 'random', endMode: 'time', durationMinutes: 5 });
+    setActiveTab('learning');
+  };
 
   useEffect(() => {
     if (stats.loginStreak > 0) {
@@ -151,7 +164,7 @@ export default function App() {
         </div>
 
         {/* 右コンテンツペイン */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative min-w-0">
           <AnimatePresence mode="wait">
             <ContentWindow 
               key={activeTab}
@@ -160,8 +173,20 @@ export default function App() {
               color={activeItem.color}
             >
               {/* 選択中タブに応じてモジュールを切り替える。 */}
-              {activeTab === 'dashboard' && <Dashboard stats={stats} />}
-              {activeTab === 'learning' && <QuizModule onComplete={updateScore} />}
+              {activeTab === 'dashboard' && (
+                <Dashboard
+                  stats={stats}
+                  onStartTimedQuiz={startTimedQuiz}
+                  onStartRandomQuiz={startRandomQuiz}
+                />
+              )}
+              {activeTab === 'learning' && (
+                <QuizModule
+                  onComplete={updateScore}
+                  launchPreset={quizPreset}
+                  onPresetConsumed={() => setQuizPreset(null)}
+                />
+              )}
               {activeTab === 'trivia' && <TriviaModule stats={stats} onUpdateStats={updateScore} />}
               {activeTab === 'local' && <LocalModule />}
               {activeTab === 'news' && <NewsModule />}
