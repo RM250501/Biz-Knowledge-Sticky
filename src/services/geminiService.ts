@@ -159,7 +159,13 @@ export async function getActualNewsTopics() {
   }
 }
 
-export async function getDailyTrivia(dayOfWeek: number) {
+type DailyTriviaOptions = {
+  browserSeed?: string;
+  avoidTitles?: string[];
+  variantIndex?: number;
+};
+
+export async function getDailyTrivia(dayOfWeek: number, options: DailyTriviaOptions = {}) {
   // 曜日ごとのテーマ定義（生成ネタの方向性を固定）。
   const categories = [
     "日：難読・雑学クイズ",
@@ -171,6 +177,24 @@ export async function getDailyTrivia(dayOfWeek: number) {
     "土：難読・雑学クイズ"
   ];
   const category = categories[dayOfWeek];
+  const avoidTitlesText = (options.avoidTitles || []).slice(-20).join(' / ');
+  const browserSeed = options.browserSeed || 'default-seed';
+  const triviaThemes = [
+    '数字の意外性',
+    '語源と歴史',
+    '人体の不思議',
+    '動物の行動',
+    '食文化の背景',
+    '科学の逆説',
+    '仕事で使える会話ネタ',
+    '身近な道具の豆知識',
+    '地理・地名の由来',
+    '法律・制度のトリビア',
+    '心理学の小ネタ',
+    'ことわざ・慣用句の由来',
+  ];
+  const normalizedVariant = Math.abs(options.variantIndex ?? 0) % triviaThemes.length;
+  const selectedTheme = triviaThemes[normalizedVariant];
 
   try {
     const ai = getGenAI();
@@ -179,6 +203,10 @@ export async function getDailyTrivia(dayOfWeek: number) {
     const prompt = `
       あなたは『明日のランチで話せるネタ帳』の編集者です。
       今日のカテゴリー「${category}」に沿った、思わず「へぇ〜」と言ってしまうような雑学を1つ生成してください。
+      ブラウザ識別シード: ${browserSeed}
+      バリアント番号: ${normalizedVariant}
+      必須テーマ: ${selectedTheme}
+      既出タイトル（再利用禁止）: ${avoidTitlesText || 'なし'}
       
       以下のJSON形式で出力してください：
       {
@@ -192,6 +220,10 @@ export async function getDailyTrivia(dayOfWeek: number) {
       制約：
       - 専門的すぎず、直感的に驚きがあるもの。
       - 出典がはっきりしている、または一般的に認められている事実であること。
+      - 必須テーマ「${selectedTheme}」に必ず沿うこと。
+      - タイトルには必須テーマに対応するキーワードを自然な形で含めること。
+      - 既出タイトル（再利用禁止）と同一・類似表現は避けること。
+      - ブラウザ識別シードを考慮し、同じ日の別ブラウザとネタが重なりにくい観点で選ぶこと。
       - 日本語で出力してください。
     `;
 
