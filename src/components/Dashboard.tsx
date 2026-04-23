@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { User, TrendingUp, Award, Calendar as CalendarIcon, Sparkles } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { User, TrendingUp, Award, Calendar as CalendarIcon, Sparkles, Shuffle, Timer, Eye, EyeOff } from 'lucide-react';
 import { 
   LineChart, 
   Line, 
@@ -17,9 +17,34 @@ import { UserStats, CATEGORY_LABELS } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
-export const Dashboard = ({ stats }: { stats: UserStats }) => {
+export const Dashboard = ({ stats, onStartTimedQuiz, onStartRandomQuiz }: { stats: UserStats; onStartTimedQuiz: () => void; onStartRandomQuiz: () => void }) => {
   // プロファイル表示とカレンダー表示の切替状態。
   const [showCalendar, setShowCalendar] = useState(false);
+  // 文字を抑えた簡易表示を既定にする。
+  const [showDetails, setShowDetails] = useState(false);
+  const [chartsReady, setChartsReady] = useState(false);
+
+  useEffect(() => {
+    const frameId = window.requestAnimationFrame(() => setChartsReady(true));
+    return () => window.cancelAnimationFrame(frameId);
+  }, []);
+
+  const todayKey = new Date().toISOString().split('T')[0];
+  const todayLog = stats.learningLog.find(log => log.date === todayKey);
+
+  const strongestCategoryEntry = Object.entries(stats.categoryScores)
+    .filter(([key]) => CATEGORY_LABELS[key])
+    .sort(([, a], [, b]) => b - a)[0];
+
+  const strongestCategoryLabel = strongestCategoryEntry
+    ? CATEGORY_LABELS[strongestCategoryEntry[0]] || strongestCategoryEntry[0]
+    : 'まだデータなし';
+
+  const nextAction = todayLog
+    ? '今日の学習は記録済み。雑学を1つアウトプットして、知識レベルも伸ばすのがおすすめです。'
+    : stats.completedQuestions.length === 0
+      ? 'まずは一般常識ドリルを1問解いて、最初のXPを積みましょう。'
+      : '学習履歴があるので、雑学ネタ帳でアウトプットを加えると伸びが見えやすくなります。';
 
   // カテゴリ別スコアをレーダーチャート用データへ変換。
   const radarData = Object.entries(stats.categoryScores)
@@ -42,12 +67,87 @@ export const Dashboard = ({ stats }: { stats: UserStats }) => {
   });
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full pb-12">
-      <div className="space-y-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full pb-12 min-w-0">
+      <div className="space-y-6 min-w-0">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
+            <Award size={14} /> 成績レポート
+          </div>
+          <button
+            onClick={() => setShowDetails(v => !v)}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-full border border-gray-200 bg-white text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            {showDetails ? <EyeOff size={14} /> : <Eye size={14} />}
+            {showDetails ? '簡易' : '詳細'}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+                <TrendingUp size={18} className="text-gray-500" />
+              </div>
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">XP</span>
+            </div>
+            <div className="text-2xl font-black text-gray-900 flex items-baseline gap-1">
+              <span>{todayLog ? `${todayLog.earnedPoints}` : '0'}</span>
+              <span className="text-sm font-black text-gray-500">XP</span>
+            </div>
+            {showDetails && <p className="text-xs text-gray-500 mt-1">今日の学習成果</p>}
+          </div>
+          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
+                <Award size={18} className="text-blue-600" />
+              </div>
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">BEST</span>
+            </div>
+            <div className="text-2xl font-black text-blue-600">{showDetails ? strongestCategoryLabel : strongestCategoryLabel.slice(0, 2)}</div>
+            {showDetails && <p className="text-xs text-gray-500 mt-1">今いちばん伸びている分野</p>}
+          </div>
+          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center">
+                <Timer size={18} className="text-orange-500" />
+              </div>
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">STREAK</span>
+            </div>
+            <div className="text-2xl font-black text-orange-600 flex items-baseline gap-1">
+              <span>{stats.loginStreak}</span>
+              <span className="text-sm font-black text-orange-500">Day</span>
+            </div>
+            {showDetails ? (
+              <p className="text-xs text-gray-500 mt-1">{stats.loginStreak > 0 ? `${stats.loginStreak}日連続学習中` : '学習を始めましょう'}</p>
+            ) : null}
+          </div>
+        </div>
+
+        {showDetails && (
+          <div className="bg-blue-50/80 border border-blue-100 rounded-2xl p-5 shadow-sm">
+            <div className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-2">Recommended Action</div>
+            <p className="text-sm text-blue-900 leading-relaxed">{nextAction}</p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                onClick={onStartTimedQuiz}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-900 text-white text-sm font-bold hover:bg-gray-800 transition-colors"
+              >
+                <Timer size={14} /> 5分ドリル
+              </button>
+              <button
+                onClick={onStartRandomQuiz}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white text-gray-800 text-sm font-bold border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                <Shuffle size={14} /> ランダム出題
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold flex items-center gap-2">
-              <User className="text-blue-500" /> Profile Status
+              <User className="text-blue-500" /> {showDetails ? 'Profile Status' : 'Profile'}
             </h3>
             <div className="flex items-center gap-2">
               <button 
@@ -74,24 +174,45 @@ export const Dashboard = ({ stats }: { stats: UserStats }) => {
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-4"
               >
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-500">Total Score</span>
-                    <span className="font-bold">{stats.score} XP</span>
+                {showDetails ? (
+                  <>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-500">Total Score</span>
+                        <span className="font-bold">{stats.score} XP</span>
+                      </div>
+                      <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                        <div className="bg-blue-500 h-full transition-all duration-500" style={{ width: `${Math.min(stats.score / 10, 100)}%` }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-500">雑学（アウトプット）</span>
+                        <span className="font-bold">{stats.knowledgeLevel} LV</span>
+                      </div>
+                      <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                        <div className="bg-purple-500 h-full transition-all duration-500" style={{ width: `${Math.min(stats.knowledgeLevel, 100)}%` }} />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-gray-50 p-3 text-center">
+                      <div className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">XP</div>
+                      <div className="text-lg font-black text-gray-900 flex items-center justify-center gap-1">
+                        <span>{stats.score}</span>
+                        <span className="text-xs font-black text-gray-500">XP</span>
+                      </div>
+                    </div>
+                    <div className="rounded-xl bg-gray-50 p-3 text-center">
+                      <div className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">LV</div>
+                      <div className="text-lg font-black text-purple-600 flex items-center justify-center gap-1">
+                        <span>{stats.knowledgeLevel}</span>
+                        <span className="text-xs font-black text-purple-500">LV</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                    <div className="bg-blue-500 h-full transition-all duration-500" style={{ width: `${Math.min(stats.score / 10, 100)}%` }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-500">雑学（アウトプット）</span>
-                    <span className="font-bold">{stats.knowledgeLevel} LV</span>
-                  </div>
-                  <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                    <div className="bg-purple-500 h-full transition-all duration-500" style={{ width: `${Math.min(stats.knowledgeLevel, 100)}%` }} />
-                  </div>
-                </div>
+                )}
               </motion.div>
             ) : (
               <motion.div
@@ -168,43 +289,53 @@ export const Dashboard = ({ stats }: { stats: UserStats }) => {
           </AnimatePresence>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm h-64">
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm h-64 min-w-0 min-h-[16rem]">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <TrendingUp className="text-green-500" /> Learning Progress
+            <TrendingUp className="text-green-500" /> {showDetails ? 'Learning Progress' : '推移'}
           </h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={stats.learningLog}>
-              {/* X 軸は日付、Y 軸は累積スコア。 */}
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-              <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} />
-              <YAxis fontSize={10} tickLine={false} axisLine={false} />
-              <Tooltip />
-              <Line type="monotone" dataKey="score" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="min-w-0 min-h-[12rem] h-[calc(100%-2.5rem)]">
+            {chartsReady ? (
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
+                <LineChart data={stats.learningLog}>
+                  {/* X 軸は日付、Y 軸は累積スコア。 */}
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                  <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} />
+                  <YAxis fontSize={10} tickLine={false} axisLine={false} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="score" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full w-full rounded-xl bg-gray-50 animate-pulse" />
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col">
+      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col min-w-0">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Award className="text-purple-500" /> Skill Radar
+          <Award className="text-purple-500" /> {showDetails ? 'Skill Radar' : '傾向'}
         </h3>
-        <div className="flex-1 min-h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
-              {/* レーダー面でカテゴリ間のバランスを可視化する。 */}
-              <PolarGrid stroke="#e5e7eb" />
-              <PolarAngleAxis dataKey="subject" fontSize={10} />
-              <Radar 
-                name="Skills" 
-                dataKey="A" 
-                stroke="#8b5cf6" 
-                fill="#8b5cf6" 
-                fillOpacity={0.6} 
-                isAnimationActive={false}
-              />
-            </RadarChart>
-          </ResponsiveContainer>
+        <div className="flex-1 min-h-[320px] min-w-0">
+          {chartsReady ? (
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={320}>
+              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                {/* レーダー面でカテゴリ間のバランスを可視化する。 */}
+                <PolarGrid stroke="#e5e7eb" />
+                <PolarAngleAxis dataKey="subject" fontSize={10} />
+                <Radar 
+                  name="Skills" 
+                  dataKey="A" 
+                  stroke="#8b5cf6" 
+                  fill="#8b5cf6" 
+                  fillOpacity={0.6} 
+                  isAnimationActive={false}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-full w-full rounded-xl bg-gray-50 animate-pulse" />
+          )}
         </div>
       </div>
     </div>

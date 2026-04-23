@@ -32,7 +32,7 @@ export const ContentWindow = ({
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
       className={cn(
-        "flex-1 h-full p-8 rounded-2xl border-2 shadow-inner overflow-auto",
+        "flex-1 h-full w-full min-w-0 p-8 rounded-2xl border-2 shadow-inner overflow-auto",
         colors[color]
       )}
     >
