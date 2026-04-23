@@ -4,6 +4,59 @@ import { Sparkles, MessageSquare, History, Check, Smile, Frown, Meh, User, Check
 import { cn } from '../lib/utils';
 import { Trivia, TriviaLog, UserStats, STATIC_TRIVIA } from '../types';
 
+const DAILY_TRIVIA_CACHE_KEY_PREFIX = 'biz_knowledge_daily_trivia_v2';
+const BROWSER_ID_KEY = 'biz_knowledge_browser_id_v1';
+
+type DailyTriviaCache = {
+  date: string;
+  trivia: Trivia;
+};
+
+function toLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function fallbackTrivia(today: Date, todayKey: string): Trivia {
+  const dayIdx = today.getDate() % STATIC_TRIVIA.length;
+  const triviaData = STATIC_TRIVIA[dayIdx];
+  return {
+    ...triviaData,
+    id: `fallback-${todayKey}`,
+    date: todayKey,
+  };
+}
+
+function getBrowserId() {
+  const existing = localStorage.getItem(BROWSER_ID_KEY);
+  if (existing) return existing;
+
+  const randomPart = Math.random().toString(36).slice(2, 10);
+  const uaPart = (navigator.userAgent || 'unknown').replace(/\s+/g, '-').slice(0, 24);
+  const browserId = `${uaPart}-${randomPart}`;
+  localStorage.setItem(BROWSER_ID_KEY, browserId);
+  return browserId;
+}
+
+async function requestAssignedTrivia(browserId: string, todayKey: string) {
+  const response = await fetch('/api/trivia/assign', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ browserId, date: todayKey }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Trivia API failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data?.trivia as Trivia;
+}
+
 interface TriviaModuleProps {
   stats: UserStats;
   onUpdateStats: (points: number, category: string, isTrivia?: boolean, triviaLogEntry?: any) => void;
@@ -20,26 +73,54 @@ export const TriviaModule = ({ stats, onUpdateStats }: TriviaModuleProps) => {
   const [logReaction, setLogReaction] = useState<'funny' | 'failed' | 'known'>('funny');
 
   useEffect(() => {
-    const fetchTrivia = () => {
+    let isMounted = true;
+
+    const fetchTrivia = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        // 日付に応じて固定データを日替わりで選ぶ。
         const today = new Date();
-        const dayIdx = today.getDate() % STATIC_TRIVIA.length;
-        const triviaData = STATIC_TRIVIA[dayIdx];
-        
-        setTrivia({
-          ...triviaData,
-          date: today.toISOString().split('T')[0],
-        });
+        const todayKey = toLocalDateKey(today);
+        const browserId = getBrowserId();
+        const dailyCacheKey = `${DAILY_TRIVIA_CACHE_KEY_PREFIX}_${browserId}`;
+
+        const cachedRaw = localStorage.getItem(dailyCacheKey);
+        if (cachedRaw) {
+          try {
+            const cached = JSON.parse(cachedRaw) as DailyTriviaCache;
+            if (cached?.date === todayKey && cached?.trivia) {
+              if (isMounted) setTrivia(cached.trivia);
+              return;
+            }
+          } catch (cacheErr) {
+            console.warn('Failed to parse daily trivia cache:', cacheErr);
+          }
+        }
+
+        const assignedTrivia = await requestAssignedTrivia(browserId, todayKey);
+        const normalizedTrivia: Trivia = assignedTrivia || fallbackTrivia(today, todayKey);
+
+        localStorage.setItem(dailyCacheKey, JSON.stringify({ date: todayKey, trivia: normalizedTrivia } satisfies DailyTriviaCache));
+
+        if (isMounted) setTrivia(normalizedTrivia);
       } catch (err) {
-        setError("ネタの取得に失敗しました。");
+        console.error('Failed to fetch daily trivia:', err);
+        const today = new Date();
+        const todayKey = toLocalDateKey(today);
+        if (isMounted) {
+          setTrivia(fallbackTrivia(today, todayKey));
+          setError('AIネタの取得に失敗したため、代替ネタを表示しています。');
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
+
     fetchTrivia();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleLogSubmit = () => {

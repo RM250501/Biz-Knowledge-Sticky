@@ -24,6 +24,12 @@ export default defineConfig(({mode}) => {
       // エージェント編集時のちらつき防止のため、通常は変更しない。
       // AI Studio 互換性を保ちつつ、ローカルでは切替可能にする。
       hmr: process.env.DISABLE_HMR !== 'true',
+      proxy: {
+        '/api': {
+          target: 'http://localhost:8787',
+          changeOrigin: true,
+        },
+      },
     },
   };
 });
