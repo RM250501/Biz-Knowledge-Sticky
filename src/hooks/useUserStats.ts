@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { UserStats, INITIAL_STATS } from '../types';
 
 export function useUserStats() {
+  // リロード後も進捗を維持できるよう、localStorage から初期化する。
   const [stats, setStats] = useState<UserStats>(() => {
     const saved = localStorage.getItem('biz_knowledge_stats');
     if (saved) {
@@ -15,11 +16,12 @@ export function useUserStats() {
   });
 
   useEffect(() => {
+    // stats が変わるたびに永続化する。
     localStorage.setItem('biz_knowledge_stats', JSON.stringify(stats));
   }, [stats]);
 
   useEffect(() => {
-    // Check for login streak
+    // 連続ログイン日数を判定する。
     const today = new Date().toISOString().split('T')[0];
     if (stats.lastLoginDate !== today) {
       setStats(prev => {
@@ -27,6 +29,7 @@ export function useUserStats() {
         const lastLogin = prev.lastLoginDate;
         
         if (lastLogin) {
+          // 最終ログイン日と今日の日付差から連続日数を判定する。
           const lastDate = new Date(lastLogin);
           const currentDate = new Date(today);
           const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
@@ -53,29 +56,32 @@ export function useUserStats() {
   const updateScore = (points: number, category: string, isTrivia: boolean = false, triviaLogEntry?: any) => {
     try {
       setStats(prev => {
+        // 全体 XP を更新。
         const newScore = (prev.score || 0) + points;
+
+        // カテゴリスコアは可視化しやすいよう上限 100 にする。
         const newCategoryScores = {
           ...(prev.categoryScores || {}),
           [category]: Math.min(((prev.categoryScores?.[category]) || 0) + points, 100)
         };
 
-        // Update rank based on score
+        // 累積スコアに応じてランクを更新。
         let newRank = prev.rank || 'インターン';
         if (newScore > 500) newRank = 'エグゼクティブ';
         else if (newScore > 300) newRank = 'マネージャー';
         else if (newScore > 100) newRank = 'シニア';
 
-        // Update knowledge level for trivia
+        // 雑学アウトプット時は知識レベルを別軸で加算。
         const newKnowledgeLevel = isTrivia 
           ? (prev.knowledgeLevel || 0) + points 
           : (prev.knowledgeLevel || 0);
 
-        // Update trivia logs
+        // 雑学ログは新しい順に先頭へ追加。
         const newTriviaLogs = triviaLogEntry 
           ? [triviaLogEntry, ...(prev.triviaLogs || [])]
           : (prev.triviaLogs || []);
 
-        // Update learning log
+        // ダッシュボード用に日次の集計ログを更新。
         const today = new Date().toISOString().split('T')[0];
         const newLearningLog = Array.isArray(prev.learningLog) ? [...prev.learningLog] : [];
         const todayLogIdx = newLearningLog.findIndex(log => log.date === today);
@@ -108,7 +114,8 @@ export function useUserStats() {
           knowledgeLevel: newKnowledgeLevel,
           triviaLogs: newTriviaLogs,
           categoryScores: newCategoryScores,
-          learningLog: newLearningLog.slice(-30) // Keep last 30 days for calendar
+          // localStorage サイズを抑えるため履歴は直近 30 日に制限。
+          learningLog: newLearningLog.slice(-30) // カレンダー表示用に直近30日分を保持
         };
       });
     } catch (error) {

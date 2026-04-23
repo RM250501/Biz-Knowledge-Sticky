@@ -18,6 +18,7 @@ export const MenuSticky = ({
   onClick, 
   color = "yellow" 
 }: MenuStickyProps) => {
+  // 付箋テーマごとの配色定義。
   const colors = {
     yellow: "bg-[#fff9c4] border-[#fbc02d] text-[#5d4037]",
     blue: "bg-[#e3f2fd] border-[#64b5f6] text-[#1565c0]",
@@ -29,6 +30,7 @@ export const MenuSticky = ({
   return (
     <motion.button
       onClick={onClick}
+      // 付箋らしい軽い動きを表現するアニメーション。
       whileHover={{ x: 10, rotate: 1 }}
       whileTap={{ scale: 0.95 }}
       className={cn(
@@ -44,6 +46,7 @@ export const MenuSticky = ({
       
       <motion.div 
         initial={{ opacity: 0, x: -10 }}
+              // 補助テキストはホバー時のみ表示。
         whileHover={{ opacity: 1, x: 0 }}
         className="mt-2 text-[10px] font-medium opacity-60 overflow-hidden h-0 group-hover:h-auto transition-all"
       >
@@ -51,6 +54,7 @@ export const MenuSticky = ({
       </motion.div>
 
       {isActive && (
+              // アクティブ項目の右側マーカー。
         <div className="absolute right-0 top-0 bottom-0 w-1 bg-black/20" />
       )}
     </motion.button>

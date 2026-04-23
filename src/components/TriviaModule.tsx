@@ -10,9 +10,11 @@ interface TriviaModuleProps {
 }
 
 export const TriviaModule = ({ stats, onUpdateStats }: TriviaModuleProps) => {
+  // 当日に表示する雑学データ。
   const [trivia, setTrivia] = useState<Trivia | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 反応ログ入力フォームの表示状態。
   const [showLogForm, setShowLogForm] = useState(false);
   const [logNote, setLogNote] = useState("");
   const [logReaction, setLogReaction] = useState<'funny' | 'failed' | 'known'>('funny');
@@ -22,6 +24,7 @@ export const TriviaModule = ({ stats, onUpdateStats }: TriviaModuleProps) => {
       setIsLoading(true);
       setError(null);
       try {
+        // 日付に応じて固定データを日替わりで選ぶ。
         const today = new Date();
         const dayIdx = today.getDate() % STATIC_TRIVIA.length;
         const triviaData = STATIC_TRIVIA[dayIdx];
@@ -41,6 +44,8 @@ export const TriviaModule = ({ stats, onUpdateStats }: TriviaModuleProps) => {
 
   const handleLogSubmit = () => {
     if (!trivia) return;
+
+    // 当日の雑学カードに紐づく 1 件のログを作成。
     const newLog: TriviaLog = {
       id: Math.random().toString(36).substr(2, 9),
       triviaId: trivia.id,
@@ -49,6 +54,7 @@ export const TriviaModule = ({ stats, onUpdateStats }: TriviaModuleProps) => {
       note: logNote
     };
 
+  // 反応に応じて付与ポイントを調整（ウケた方が高い）。
     onUpdateStats(logReaction === 'funny' ? 10 : 5, 'trivia', true, newLog);
     
     setShowLogForm(false);
@@ -81,6 +87,7 @@ export const TriviaModule = ({ stats, onUpdateStats }: TriviaModuleProps) => {
 
   if (!trivia) return null;
 
+  // 同じ triviaId に対する重複記録を防止する判定。
   const hasTalked = stats.triviaLogs.some(log => log.triviaId === trivia.id);
 
   return (

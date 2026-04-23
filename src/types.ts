@@ -1,3 +1,4 @@
+// 4択クイズ1問分のデータ構造。
 export interface Question {
   id: string;
   category: 'english' | 'kanji' | 'manners' | 'politics' | 'weather' | 'admin';
@@ -8,6 +9,7 @@ export interface Question {
   explanation: string;
 }
 
+// Trivia モジュールで表示する日替わり雑学カードの構造。
 export interface Trivia {
   id: string;
   category: string;
@@ -19,6 +21,7 @@ export interface Trivia {
   date: string;
 }
 
+// 雑学を話した結果のリアクション記録。
 export interface TriviaLog {
   id: string;
   triviaId: string;
@@ -27,6 +30,7 @@ export interface TriviaLog {
   note: string;
 }
 
+// localStorage に保存する学習進捗の集約状態。
 export interface UserStats {
   rank: string;
   score: number;
@@ -39,12 +43,14 @@ export interface UserStats {
   lastLoginDate: string;
 }
 
+// 将来拡張向けのアカウント構造（現 UI では未使用）。
 export interface UserAccount {
   username: string;
-  password?: string; // We'll store simple password in localstorage for this demo
+  password?: string; // デモ用のため、簡易なパスワード保持を想定
   createdAt: string;
 }
 
+// カテゴリ ID を画面表示名に変換するラベル辞書。
 export const CATEGORY_LABELS: Record<string, string> = {
   english: '英語',
   kanji: '漢字',
@@ -55,6 +61,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   trivia: '雑学',
 };
 
+// 初回起動時に使うユーザー状態の初期値。
 export const INITIAL_STATS: UserStats = {
   rank: 'インターン',
   score: 0,
@@ -75,6 +82,7 @@ export const INITIAL_STATS: UserStats = {
   lastLoginDate: '',
 };
 
+// 日替わり表示用の固定雑学データ。
 export const STATIC_TRIVIA: Trivia[] = [
   {
     id: '1',
@@ -108,8 +116,9 @@ export const STATIC_TRIVIA: Trivia[] = [
   }
 ];
 
+// QuizModule が参照する問題データ本体。
 export const QUESTIONS: Question[] = [
-  // --- 英語 (English) ---
+  // --- 英語 ---
   {
     id: 'e1',
     category: 'english',
@@ -227,7 +236,7 @@ export const QUESTIONS: Question[] = [
     correctIndex: 2,
     explanation: 'Attached file（添付ファイル）のように、Attached が「添付された」という意味で使われます。'
   },
-  // --- 漢字 (Kanji) ---
+  // --- 漢字 ---
   {
     id: 'k1',
     category: 'kanji',
@@ -345,7 +354,7 @@ export const QUESTIONS: Question[] = [
     correctIndex: 0,
     explanation: '「妨げる（さまたげる）」は、進行を邪魔することを指します。'
   },
-  // --- ビジネスマナー (Business Manners) ---
+  // --- ビジネスマナー ---
   {
     id: 'm1',
     category: 'manners',
@@ -493,7 +502,7 @@ export const QUESTIONS: Question[] = [
     correctIndex: 1,
     explanation: '不在を伝え、折り返しの提案をするのが基本です。個人情報の観点から不用意に携帯番号を教えてはいけません。'
   },
-  // --- 政治 (Politics) ---
+  // --- 政治 ---
   {
     id: 'p1',
     category: 'politics',
@@ -611,7 +620,7 @@ export const QUESTIONS: Question[] = [
     correctIndex: 2,
     explanation: '選挙区によって議員1人を当選させるのに必要な票の数に差があることで、一票の重みが不平等になる問題です。'
   },
-  // --- 気象 (Meteorology) ---
+  // --- 気象 ---
   {
     id: 'w1',
     category: 'weather',
@@ -744,7 +753,7 @@ export const QUESTIONS: Question[] = [
     correctIndex: 1,
     explanation: '北半球では、低気圧は中心に向かって「反時計回り」に吹き込みます。高気圧は時計回りに吹き出します。'
   },
-  // --- 行政 (Administration) ---
+  // --- 行政 ---
   {
     id: 'a1',
     category: 'admin',
@@ -862,7 +871,7 @@ export const QUESTIONS: Question[] = [
     correctIndex: 2,
     explanation: '住民税のうち「都道府県民税」は都道府県が徴収します。消費税や所得税は国税です。'
   },
-  // --- 英語 (English) Part 2 ---
+  // --- 英語 Part 2 ---
   {
     id: 'e14',
     category: 'english',
@@ -908,7 +917,7 @@ export const QUESTIONS: Question[] = [
     correctIndex: 1,
     explanation: 'It\'s a pleasure to meet you. は、初対面の相手に対する非常に丁寧でビジネスに適した挨拶です。'
   },
-  // --- 漢字 (Kanji) Part 2 ---
+  // --- 漢字 Part 2 ---
   {
     id: 'k14',
     category: 'kanji',
@@ -954,7 +963,7 @@ export const QUESTIONS: Question[] = [
     correctIndex: 1,
     explanation: '「進捗（しんちょく）」と読みます。物事の進み具合を指します。'
   },
-  // --- ビジネスマナー (Business Manners) Part 2 ---
+  // --- ビジネスマナー Part 2 ---
   {
     id: 'm14',
     category: 'manners',
@@ -1000,7 +1009,7 @@ export const QUESTIONS: Question[] = [
     correctIndex: 1,
     explanation: '「ご教示（ごきょうじ）」は方法や手順を教わる際に使い、「ご教授（ごきょうじゅ）」は学問や芸術などを長期間習う際に使います。'
   },
-  // --- 政治 (Politics) Part 2 ---
+  // --- 政治 Part 2 ---
   {
     id: 'p14',
     category: 'politics',
@@ -1046,7 +1055,7 @@ export const QUESTIONS: Question[] = [
     correctIndex: 0,
     explanation: 'シャドウ・キャビネットは、野党が閣僚に相当する担当者を決めておく体制です。'
   },
-  // --- 気象 (Meteorology) Part 2 ---
+  // --- 気象 Part 2 ---
   {
     id: 'w14',
     category: 'weather',
@@ -1092,7 +1101,7 @@ export const QUESTIONS: Question[] = [
     correctIndex: 1,
     explanation: '太平洋赤道域の海水温の変化が気圧配置に影響し、日本の夏は太平洋高気圧の張り出しが弱まって「冷夏」や「長雨」になりやすくなります。'
   },
-  // --- 行政 (Administration) Part 2 ---
+  // --- 行政 Part 2 ---
   {
     id: 'a14',
     category: 'admin',

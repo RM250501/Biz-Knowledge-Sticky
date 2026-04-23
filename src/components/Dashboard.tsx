@@ -18,7 +18,10 @@ import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 export const Dashboard = ({ stats }: { stats: UserStats }) => {
+  // プロファイル表示とカレンダー表示の切替状態。
   const [showCalendar, setShowCalendar] = useState(false);
+
+  // カテゴリ別スコアをレーダーチャート用データへ変換。
   const radarData = Object.entries(stats.categoryScores)
     .filter(([key]) => CATEGORY_LABELS[key])
     .map(([key, value]) => ({
@@ -31,6 +34,7 @@ export const Dashboard = ({ stats }: { stats: UserStats }) => {
   const currentMonthDays = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
   const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).getDay();
 
+  // 当月の日付配列を作り、該当日の学習ログを紐付ける。
   const calendarDays = Array.from({ length: currentMonthDays }, (_, i) => {
     const date = new Date(today.getFullYear(), today.getMonth(), i + 1).toISOString().split('T')[0];
     const log = stats.learningLog.find(l => l.date === date);
@@ -108,9 +112,11 @@ export const Dashboard = ({ stats }: { stats: UserStats }) => {
                     <div key={`empty-${i}`} />
                   ))}
                   {calendarDays.map(({ day, date, log }) => {
+                    // 今日の日付を強調して現在位置を把握しやすくする。
                     const isToday = today.toISOString().split('T')[0] === date;
                     const earnedXp = log?.earnedPoints || 0;
                     
+                    // 日次獲得 XP に応じてカレンダー色を変える。
                     let bgClass = "bg-gray-100/50 text-gray-500 border border-gray-200/50";
                     if (log) {
                       if (earnedXp >= 100) bgClass = "bg-orange-500 text-white shadow-[0_4px_12px_rgba(249,115,22,0.4)] scale-110 z-10 animate-pulse border-none";
@@ -168,6 +174,7 @@ export const Dashboard = ({ stats }: { stats: UserStats }) => {
           </h3>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={stats.learningLog}>
+              {/* X 軸は日付、Y 軸は累積スコア。 */}
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
               <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} />
               <YAxis fontSize={10} tickLine={false} axisLine={false} />
@@ -185,6 +192,7 @@ export const Dashboard = ({ stats }: { stats: UserStats }) => {
         <div className="flex-1 min-h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+              {/* レーダー面でカテゴリ間のバランスを可視化する。 */}
               <PolarGrid stroke="#e5e7eb" />
               <PolarAngleAxis dataKey="subject" fontSize={10} />
               <Radar 

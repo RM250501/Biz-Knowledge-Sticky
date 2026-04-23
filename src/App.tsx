@@ -24,10 +24,14 @@ import { useUserStats } from './hooks/useUserStats';
 import { useCurrentTime } from './hooks/useCurrentTime';
 
 export default function App() {
+  // 学習進捗 state とスコア更新 API を取得。
   const { stats, setStats, updateScore } = useUserStats();
+  // 右側コンテンツで表示するモジュールのタブ状態。
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  // ヘッダー表示用の現在時刻。
   const currentTime = useCurrentTime();
 
+  // 左メニュー定義（id によって表示分岐する）。
   const menuItems = [
     { id: 'dashboard', icon: LayoutDashboard, title: '成績レポート', color: 'blue' as const },
     { id: 'learning', icon: BookOpen, title: '一般常識ドリル', color: 'yellow' as const },
@@ -37,14 +41,17 @@ export default function App() {
   ];
 
   const activeItem = menuItems.find(item => item.id === activeTab) || menuItems[0];
+  // ログイン連続日数更新時に一度だけ表示する演出。
   const [showStreakAnim, setShowStreakAnim] = useState(false);
 
   useEffect(() => {
     if (stats.loginStreak > 0) {
+      // 同じ日数の演出を繰り返し表示しないための判定。
       const lastSeenStreak = localStorage.getItem('last_seen_streak');
       if (lastSeenStreak !== stats.loginStreak.toString()) {
         setShowStreakAnim(true);
         localStorage.setItem('last_seen_streak', stats.loginStreak.toString());
+        // 一定時間後に演出を自動で閉じる。
         setTimeout(() => setShowStreakAnim(false), 3000);
       }
     }
@@ -75,11 +82,11 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-      {/* Background Pattern */}
+      {/* 背景のドットパターン */}
       <div className="absolute inset-0 opacity-[0.02] pointer-events-none" 
            style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
 
-      {/* Header */}
+      {/* ヘッダー */}
       <div className="px-8 py-6 flex justify-between items-center relative z-10 bg-white/50 backdrop-blur-sm border-b border-gray-100">
         <div className="flex items-center gap-4">
           <div className="bg-yellow-400 p-2 -rotate-2 shadow-sm">
@@ -114,9 +121,9 @@ export default function App() {
         </div>
       </div>
 
-      {/* Main Content Area */}
+      {/* メインコンテンツ領域 */}
       <div className="flex-1 flex overflow-hidden p-8 gap-8">
-        {/* Left Menu (Sticky Notes) */}
+        {/* 左メニュー（付箋） */}
         <div className="w-64 flex flex-col">
           <div className="mb-6 px-2">
             <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Main Menu</h3>
@@ -143,7 +150,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right Content Pane */}
+        {/* 右コンテンツペイン */}
         <div className="flex-1 relative">
           <AnimatePresence mode="wait">
             <ContentWindow 
@@ -152,6 +159,7 @@ export default function App() {
               icon={activeItem.icon}
               color={activeItem.color}
             >
+              {/* 選択中タブに応じてモジュールを切り替える。 */}
               {activeTab === 'dashboard' && <Dashboard stats={stats} />}
               {activeTab === 'learning' && <QuizModule onComplete={updateScore} />}
               {activeTab === 'trivia' && <TriviaModule stats={stats} onUpdateStats={updateScore} />}
@@ -162,7 +170,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* Footer */}
+      {/* フッター */}
       <div className="px-8 py-4 flex justify-between items-center text-[9px] text-gray-400 font-bold uppercase tracking-[0.3em] border-t border-gray-100 bg-white/30">
         <span>© 2026 Biz-Knowledge Sticky System</span>
         <div className="flex gap-4">

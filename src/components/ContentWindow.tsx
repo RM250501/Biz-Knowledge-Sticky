@@ -16,6 +16,7 @@ export const ContentWindow = ({
   children, 
   color = "yellow" 
 }: ContentWindowProps) => {
+  // 選択中メニュー色に合わせた背景色・枠色の定義。
   const colors = {
     yellow: "bg-[#fffde7] border-[#fff59d]",
     blue: "bg-[#f1f8ff] border-[#bbdefb]",
@@ -26,6 +27,7 @@ export const ContentWindow = ({
 
   return (
     <motion.div
+      // タブ切替時のスライドイン演出。
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
@@ -36,6 +38,7 @@ export const ContentWindow = ({
     >
       <div className="flex items-center gap-3 mb-8 border-b pb-4 border-black/5">
         <div className="p-3 bg-white rounded-xl shadow-sm">
+          {/* 現在のタブに紐づくアイコンを動的に描画 */}
           <Icon size={24} className="text-gray-700" />
         </div>
         <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">{title}</h2>
