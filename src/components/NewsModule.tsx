@@ -4,17 +4,21 @@ import { cn } from '../lib/utils';
 import { getActualNewsTopics } from '../services/geminiService';
 
 export const NewsModule = () => {
+  // UI に表示するカテゴリ別ニュースカード。
   const [displayNews, setDisplayNews] = useState<any[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // 画面表示用の最終更新時刻。
   const [lastUpdated, setLastUpdated] = useState<string>("");
 
   const fetchNews = useCallback(async (force = false) => {
+    // キャッシュは日付単位で管理する。
     const today = new Date().toISOString().split('T')[0];
     const savedNews = localStorage.getItem('biz_daily_news');
     const savedDate = localStorage.getItem('biz_daily_news_date');
 
     if (!force && savedNews && savedDate === today) {
       try {
+        // 同日内の再取得を避けるためローカルキャッシュを再利用。
         setDisplayNews(JSON.parse(savedNews));
         setLastUpdated(localStorage.getItem('biz_daily_news_time') || "");
         return;
@@ -25,13 +29,14 @@ export const NewsModule = () => {
 
     setIsRefreshing(true);
     try {
+      // Gemini サービスから最新カテゴリニュースを取得。
       const categories = await getActualNewsTopics();
       if (categories && Array.isArray(categories) && categories.length > 0) {
         const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         setDisplayNews(categories);
         setLastUpdated(timeStr);
         
-        // Persist for the day
+        // 日付が変わるまでキャッシュとして保持。
         localStorage.setItem('biz_daily_news', JSON.stringify(categories));
         localStorage.setItem('biz_daily_news_date', today);
         localStorage.setItem('biz_daily_news_time', timeStr);
@@ -40,14 +45,14 @@ export const NewsModule = () => {
       }
     } catch (error) {
       console.error("Failed to fetch news topics:", error);
-      // Fallback if empty and not first time? 
-      // Or just state error
+      // 取得失敗時は下部の空状態メッセージで再取得を促す。
     } finally {
       setIsRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
+    // モジュール表示時の初回ロード。
     fetchNews();
   }, [fetchNews]);
 

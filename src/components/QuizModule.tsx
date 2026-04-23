@@ -8,16 +8,23 @@ interface QuizModuleProps {
 }
 
 export const QuizModule = ({ onComplete }: QuizModuleProps) => {
+  // 選択カテゴリに応じて出題プールを決める。
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  // 現在の問題インデックス。
   const [currentIdx, setCurrentIdx] = useState(0);
+  // ユーザーが選択した選択肢。
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  // 回答後は再入力を防ぐ。
   const [isAnswered, setIsAnswered] = useState(false);
+  // 1 問ごとの制限時間カウント。
   const [timeLeft, setTimeLeft] = useState(10);
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
+  // カテゴリ内の出題順をランダム化した配列。
   const [shuffledQuestions, setShuffledQuestions] = useState<Question[]>([]);
 
   useEffect(() => {
     if (selectedCategory) {
+      // カテゴリ選択時に対象問題を抽出してシャッフル。
       const filtered = QUESTIONS.filter(q => q.category === selectedCategory);
       if (filtered.length > 0) {
         setShuffledQuestions([...filtered].sort(() => Math.random() - 0.5));
@@ -35,10 +42,12 @@ export const QuizModule = ({ onComplete }: QuizModuleProps) => {
   const currentQuestion = shuffledQuestions[currentIdx];
 
   useEffect(() => {
+    // 有効な未回答問題がある間だけカウントダウンする。
     if (selectedCategory && timeLeft > 0 && !isAnswered && currentQuestion) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
     } else if (selectedCategory && timeLeft === 0 && !isAnswered && currentQuestion) {
+      // 時間切れ時は不正インデックス扱いで回答確定。
       handleAnswer(-1);
     }
   }, [timeLeft, isAnswered, selectedCategory, currentQuestion]);
@@ -46,15 +55,16 @@ export const QuizModule = ({ onComplete }: QuizModuleProps) => {
   const handleAnswer = (idx: number) => {
     if (isAnswered || !currentQuestion) return;
     
-    // Set state first
+    // 先に回答状態を確定する。
     setSelectedOption(idx);
     setIsAnswered(true);
     setAiFeedback(currentQuestion.explanation || "解説はありません。");
 
-    // Then call external update
+    // その後に外部のスコア更新を呼び出す。
     const isCorrect = idx === currentQuestion.correctIndex;
     if (isCorrect) {
       try {
+        // 正解時のみカテゴリに XP を加算。
         onComplete(10, currentQuestion.category);
       } catch (e) {
         console.error("Error in onComplete:", e);
@@ -63,6 +73,7 @@ export const QuizModule = ({ onComplete }: QuizModuleProps) => {
   };
 
   const nextQuestion = () => {
+    // 次の問題へ進むか、カテゴリ選択に戻るかを判定。
     if (currentIdx < shuffledQuestions.length - 1) {
       setCurrentIdx(currentIdx + 1);
       setSelectedOption(null);
@@ -78,6 +89,7 @@ export const QuizModule = ({ onComplete }: QuizModuleProps) => {
   if (!selectedCategory) {
     return (
       <div className="space-y-6">
+        {/* 初期状態ではカテゴリ選択 UI を表示。 */}
         <h2 className="text-xl font-bold text-gray-800 border-b pb-2">学習カテゴリを選択してください</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
@@ -97,7 +109,7 @@ export const QuizModule = ({ onComplete }: QuizModuleProps) => {
     );
   }
 
-  // Handle case where category is selected but questions are not yet loaded or don't exist
+  // カテゴリ選択済みだが問題が未ロード/未定義の場合の分岐。
   if (shuffledQuestions.length === 0) {
     const hasQuestions = QUESTIONS.some(q => q.category === selectedCategory);
     if (!hasQuestions) {

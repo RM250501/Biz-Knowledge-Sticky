@@ -1,9 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
 
+// クライアント再生成を避けるため、呼び出し間で使い回すシングルトン。
 let genAI: any = null;
 
 function getGenAI() {
   if (!genAI) {
+    // API キーは環境変数を Vite define で埋め込んで参照する。
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY is not set");
@@ -17,6 +19,7 @@ export async function getAIExplanation(question: string, userAnswer: string, isC
   try {
     const ai = getGenAI();
     
+    // ビジネス学習向けに、短く実用的な解説を返すプロンプト。
     const prompt = `
       あなたはプロのビジネスコンサルタントです。
       ユーザーが一般常識を学習しています。
@@ -31,6 +34,7 @@ export async function getAIExplanation(question: string, userAnswer: string, isC
       100文字程度で、日本語で回答してください。
     `;
 
+    // 短文フィードバック生成には高速モデルを利用。
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
@@ -47,15 +51,19 @@ export async function getAIExplanation(question: string, userAnswer: string, isC
 export async function getActualLocalInfo(lat: number, lon: number) {
   try {
     const ai = getGenAI();
+    // 現在地座標を基準に、実用的なローカル情報を取得。
     const prompt = `現在地（緯度: ${lat}, 経度: ${lon}）周辺の「実際の」最新情報を教えてください。住所は座標から推測される具体的な地名にしてください。ニュースはその地域に関連する実在する主要な地域トピックにしてください。`;
 
     const response = await ai.models.generateContent({
+      // 構造化出力と検索を伴うため、より高性能なモデルを利用。
       model: "gemini-3.1-pro-preview",
       contents: prompt,
       config: {
+        // Google Search による根拠付き生成を許可。
         tools: [{ googleSearch: {} }],
         toolConfig: { includeServerSideToolInvocations: true },
         responseMimeType: "application/json",
+        // UI で扱いやすいよう、JSON 形をスキーマで固定。
         responseSchema: {
           type: "OBJECT",
           properties: {
@@ -98,6 +106,7 @@ export async function getActualNewsTopics() {
   try {
     const ai = getGenAI();
     const today = new Date().toLocaleDateString('ja-JP');
+    // カテゴリ別抽出と URL 品質要件を明示したプロンプト。
     const prompt = `あなたはプロのニュースキュレーターです。本日（${today}時点）の日本および世界の主要ニュース・業界動向を調査し、以下のカテゴリーごとに実在する最新記事をピックアップしてください：
     1. IT・テクノロジー
     2. 経済・ビジネス
@@ -114,6 +123,7 @@ export async function getActualNewsTopics() {
         tools: [{ googleSearch: {} }],
         toolConfig: { includeServerSideToolInvocations: true },
         responseMimeType: "application/json",
+        // カテゴリ配列 + 記事オブジェクトの構造化出力。
         responseSchema: {
           type: "ARRAY",
           items: {
@@ -141,7 +151,7 @@ export async function getActualNewsTopics() {
     });
 
     const text = response.text;
-    console.log("Gemini News Response:", text); // Debug log
+    console.log("Gemini News Response:", text); // デバッグ用ログ
     return JSON.parse(text || "[]");
   } catch (error) {
     console.error("Gemini News Error:", error);
@@ -150,6 +160,7 @@ export async function getActualNewsTopics() {
 }
 
 export async function getDailyTrivia(dayOfWeek: number) {
+  // 曜日ごとのテーマ定義（生成ネタの方向性を固定）。
   const categories = [
     "日：難読・雑学クイズ",
     "月：言葉の由来",
@@ -164,6 +175,7 @@ export async function getDailyTrivia(dayOfWeek: number) {
   try {
     const ai = getGenAI();
 
+    // そのまま UI に渡せる雑学 JSON を生成するプロンプト。
     const prompt = `
       あなたは『明日のランチで話せるネタ帳』の編集者です。
       今日のカテゴリー「${category}」に沿った、思わず「へぇ〜」と言ってしまうような雑学を1つ生成してください。
@@ -184,6 +196,7 @@ export async function getDailyTrivia(dayOfWeek: number) {
     `;
 
     const response = await ai.models.generateContent({
+      // 短い創作生成のため高速モデルを利用。
       model: "gemini-3-flash-preview",
       contents: prompt,
       config: {

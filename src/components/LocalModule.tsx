@@ -5,13 +5,16 @@ import { cn } from '../lib/utils';
 import { getActualLocalInfo } from '../services/geminiService';
 
 export const LocalModule = () => {
+  // ブラウザから取得した座標（または取得エラー）。
   const { location, error: geoError } = useGeolocation();
+  // 取得したローカル情報の表示 state。
   const [address, setAddress] = useState<string>("位置情報を取得中...");
   const [weather, setWeather] = useState({ temp: 22, condition: "晴れ", humidity: 45 });
   const [localNews, setLocalNews] = useState<{title: string, source: string}[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const refreshData = useCallback(async (lat?: number, lon?: number) => {
+    // 引数の座標を優先し、未指定時は hook の座標を使う。
     const targetLat = typeof lat === 'number' ? lat : location?.lat;
     const targetLon = typeof lon === 'number' ? lon : location?.lon;
 
@@ -19,6 +22,7 @@ export const LocalModule = () => {
     
     setIsRefreshing(true);
     try {
+      // Gemini 連携サービスで住所・天気・地域ニュースを取得。
       const data = await getActualLocalInfo(targetLat, targetLon);
       if (data) {
         setAddress(data.address);
@@ -34,8 +38,10 @@ export const LocalModule = () => {
 
   useEffect(() => {
     if (location) {
+      // 位置情報が取得できたら初回データを自動取得。
       refreshData(location.lat, location.lon);
     } else if (geoError) {
+      // 許可拒否や取得失敗時のフォールバック表示。
       setAddress("位置情報の取得に失敗しました（デフォルト: 東京）");
     }
   }, [location, geoError, refreshData]);
@@ -64,7 +70,7 @@ export const LocalModule = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Weather Card */}
+        {/* 天気カード */}
         <div className="bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden group">
           <div className="relative z-10">
             <div className="flex justify-between items-start mb-8">
@@ -84,7 +90,7 @@ export const LocalModule = () => {
           </div>
         </div>
 
-        {/* Local News Card */}
+        {/* 地域ニュースカード */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex flex-col hover:shadow-md transition-shadow">
           <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
             <Newspaper size={14} className="text-pink-500" /> 周辺のニュース
