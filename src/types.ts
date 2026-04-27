@@ -30,6 +30,40 @@ export interface TriviaLog {
   note: string;
 }
 
+// お天気モジュールの現在天気表示データ。
+export interface CurrentWeather {
+  temp: number;
+  condition: string;
+  humidity: number;
+  windSpeed: number;
+  precipitationProb: number;
+  precipitationMm: number;
+  updatedAt: string;
+}
+
+// 時間帯ごとの短期予報アイテム。
+export interface ForecastItem {
+  time: string;
+  temp: number;
+  condition: string;
+  precipitationProb: number;
+  precipitationMm: number;
+}
+
+// 表示用に整形した注意喚起情報。
+export interface WeatherAlert {
+  level: 'info' | 'watch' | 'warning';
+  title: string;
+  detail: string;
+}
+
+// 現在天気・予報・注意喚起をまとめた取得結果。
+export interface WeatherBundle {
+  current: CurrentWeather;
+  forecast: ForecastItem[];
+  alerts: WeatherAlert[];
+}
+
 // localStorage に保存する学習進捗の集約状態。
 export interface UserStats {
   rank: string;
