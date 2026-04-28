@@ -293,8 +293,8 @@ export const Dashboard = ({ stats, onStartTimedQuiz, onStartRandomQuiz }: { stat
           </h3>
           <div className="min-w-0 min-h-[12rem] h-[calc(100%-2.5rem)]">
             {chartsReady ? (
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
-                <LineChart data={stats.learningLog}>
+                <ResponsiveContainer width="100%" height={240} minWidth={0} minHeight={240}>
+                  <LineChart data={stats.learningLog}>
                   {/* X 軸は日付、Y 軸は累積スコア。 */}
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                   <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} />
@@ -316,7 +316,7 @@ export const Dashboard = ({ stats, onStartTimedQuiz, onStartRandomQuiz }: { stat
         </h3>
         <div className="flex-1 min-h-[320px] min-w-0">
           {chartsReady ? (
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={320}>
+            <ResponsiveContainer width="100%" height={320} minWidth={0} minHeight={320}>
               <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
                 {/* レーダー面でカテゴリ間のバランスを可視化する。 */}
                 <PolarGrid stroke="#e5e7eb" />

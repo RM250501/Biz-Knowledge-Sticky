@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
+import initSqlJs from 'sql.js';
 
 dotenv.config({ path: '.env.local' });
 dotenv.config();
@@ -28,12 +29,61 @@ type TriviaState = {
 
 const PORT = Number(process.env.TRIVIA_API_PORT || 8787);
 const DATA_DIR = path.resolve(process.cwd(), '.data');
-const DATA_FILE = path.join(DATA_DIR, 'trivia-assignments.json');
+const DB_FILE = path.join(DATA_DIR, 'trivia.db');
 
 const app = express();
 app.use(express.json());
 
+// Serve built frontend if available (production single-process mode).
+const DIST_DIR = path.resolve(process.cwd(), 'dist');
+if (fs.existsSync(DIST_DIR)) {
+  app.use(express.static(DIST_DIR));
+
+  // SPA fallback for non-API routes
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(DIST_DIR, 'index.html'));
+  });
+}
+
 let genAI: GoogleGenAI | null = null;
+let SQL: any = null;
+let db: any = null;
+
+async function initDb() {
+  if (db) return db;
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  SQL = await initSqlJs({});
+
+  if (fs.existsSync(DB_FILE)) {
+    const buffer = fs.readFileSync(DB_FILE);
+    db = new SQL.Database(new Uint8Array(buffer));
+  } else {
+    db = new SQL.Database();
+  }
+
+  // Ensure table exists
+  db.run(`
+    CREATE TABLE IF NOT EXISTS trivia_assignments (
+      id TEXT PRIMARY KEY,
+      browserId TEXT,
+      date TEXT,
+      category TEXT,
+      title TEXT,
+      explanation TEXT,
+      doyaPoint TEXT,
+      starter TEXT,
+      target TEXT
+    );
+  `);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_trivia_date ON trivia_assignments(date);`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_trivia_browser_date ON trivia_assignments(browserId, date);`);
+
+  // persist initial DB state
+  const data = db.export();
+  fs.writeFileSync(DB_FILE, Buffer.from(data));
+  return db;
+}
 
 function getGenAI() {
   if (!genAI) {
@@ -148,29 +198,72 @@ const STATIC_TRIVIA_POOL: Omit<Trivia, 'id' | 'date'>[] = [
   }
 ];
 
-async function readState(): Promise<TriviaState> {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+async function getAssignedFromDb(browserId: string, dateKey: string): Promise<Trivia | null> {
+  await initDb();
+  const stmt = db.prepare('SELECT * FROM trivia_assignments WHERE browserId = :b AND date = :d');
+  stmt.bind({ ':b': browserId, ':d': dateKey });
+  const hasRow = stmt.step();
+  if (!hasRow) {
+    stmt.free();
+    return null;
   }
-
-  if (!fs.existsSync(DATA_FILE)) {
-    const initial: TriviaState = { byDate: {} };
-    fs.writeFileSync(DATA_FILE, JSON.stringify(initial, null, 2), 'utf-8');
-    return initial;
-  }
-
-  try {
-    const raw = fs.readFileSync(DATA_FILE, 'utf-8');
-    const parsed = JSON.parse(raw) as TriviaState;
-    return parsed?.byDate ? parsed : { byDate: {} };
-  } catch (error) {
-    console.error('Failed to parse trivia state. Resetting.', error);
-    return { byDate: {} };
-  }
+  const row = stmt.getAsObject();
+  stmt.free();
+  return {
+    id: row.id,
+    category: row.category,
+    title: row.title,
+    explanation: row.explanation,
+    doyaPoint: row.doyaPoint,
+    starter: row.starter,
+    target: JSON.parse(row.target || '[]'),
+    date: row.date,
+  } as Trivia;
 }
 
-async function writeState(state: TriviaState) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(state, null, 2), 'utf-8');
+async function insertAssignmentToDb(trivia: Trivia, browserId: string) {
+  await initDb();
+  const stmt = db.prepare(`INSERT INTO trivia_assignments (id, browserId, date, category, title, explanation, doyaPoint, starter, target) VALUES (:id, :b, :d, :cat, :title, :exp, :doya, :starter, :target)`);
+  stmt.bind({
+    ':id': trivia.id,
+    ':b': browserId,
+    ':d': trivia.date,
+    ':cat': trivia.category,
+    ':title': trivia.title,
+    ':exp': trivia.explanation,
+    ':doya': trivia.doyaPoint,
+    ':starter': trivia.starter,
+    ':target': JSON.stringify(trivia.target),
+  });
+  stmt.run();
+  stmt.free();
+
+  // persist to file
+  const data = db.export();
+  fs.writeFileSync(DB_FILE, Buffer.from(data));
+}
+
+async function getUsedTitlesFromDb(dateKey: string): Promise<Set<string>> {
+  await initDb();
+  const stmt = db.prepare('SELECT title FROM trivia_assignments WHERE date = :d');
+  stmt.bind({ ':d': dateKey });
+  const used = new Set<string>();
+  while (stmt.step()) {
+    const row = stmt.getAsObject();
+    used.add(normalizeTitle(row.title || ''));
+  }
+  stmt.free();
+  return used;
+}
+
+async function pruneOldEntries(cutoffKey: string) {
+  await initDb();
+  const stmt = db.prepare('DELETE FROM trivia_assignments WHERE date < :c');
+  stmt.bind({ ':c': cutoffKey });
+  stmt.run();
+  stmt.free();
+  const data = db.export();
+  fs.writeFileSync(DB_FILE, Buffer.from(data));
 }
 
 function sanitizeTrivia(input: any, dateKey: string, idSeed: string): Trivia {
@@ -298,23 +391,14 @@ app.post('/api/trivia/assign', async (req, res) => {
   }
 
   writeQueue = writeQueue.then(async () => {
-    const state = await readState();
-    const daily = state.byDate[dateKey] || { assignedByBrowser: {} };
-
-    const existing = daily.assignedByBrowser[browserId];
-    if (existing) {
-      res.json({ trivia: existing, source: 'existing' });
-      return;
-    }
-
-    const usedTitles = new Set(
-      Object.values(daily.assignedByBrowser).map(item => normalizeTitle(item.title))
-    );
+    // In AI-only mode we do not return prior assignments; always attempt fresh AI generation.
+    const usedTitles = await getUsedTitlesFromDb(dateKey);
     const variantIndex = hashString(`${dateKey}-${browserId}`) % 12;
 
     let assigned: Trivia | null = null;
 
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    // Try multiple times to get a unique AI-generated trivia.
+    for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
         const aiTrivia = await generateAITrivia(
           dateKey,
@@ -337,21 +421,19 @@ app.post('/api/trivia/assign', async (req, res) => {
     }
 
     if (!assigned) {
-      assigned = generateGuaranteedUniqueFallback(dateKey, usedTitles, variantIndex);
+      // Complete AI mode: if AI cannot produce a unique trivia, return error.
+      res.status(503).json({ error: 'ai_unavailable', message: 'AI trivia generation failed; try again later.' });
+      return;
     }
 
-    daily.assignedByBrowser[browserId] = assigned;
-    state.byDate[dateKey] = daily;
+    await insertAssignmentToDb(assigned, browserId);
 
     // 直近45日だけ保持。
     const cutoff = new Date(dateKey);
     cutoff.setDate(cutoff.getDate() - 45);
     const cutoffKey = toDateKey(cutoff);
-    for (const key of Object.keys(state.byDate)) {
-      if (key < cutoffKey) delete state.byDate[key];
-    }
+    await pruneOldEntries(cutoffKey);
 
-    await writeState(state);
     res.json({ trivia: assigned, source: 'new' });
   }).catch((error) => {
     console.error('Assignment queue failed:', error);
