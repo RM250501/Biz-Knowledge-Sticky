@@ -98,18 +98,14 @@ export const TriviaModule = ({ stats, onUpdateStats }: TriviaModuleProps) => {
         }
 
         const assignedTrivia = await requestAssignedTrivia(browserId, todayKey);
-        const normalizedTrivia: Trivia = assignedTrivia || fallbackTrivia(today, todayKey);
-
-        localStorage.setItem(dailyCacheKey, JSON.stringify({ date: todayKey, trivia: normalizedTrivia } satisfies DailyTriviaCache));
-
-        if (isMounted) setTrivia(normalizedTrivia);
+        // In AI-only mode, API must return a trivia or an error. Cache and set when available.
+        localStorage.setItem(dailyCacheKey, JSON.stringify({ date: todayKey, trivia: assignedTrivia } satisfies DailyTriviaCache));
+        if (isMounted) setTrivia(assignedTrivia);
       } catch (err) {
         console.error('Failed to fetch daily trivia:', err);
-        const today = new Date();
-        const todayKey = toLocalDateKey(today);
         if (isMounted) {
-          setTrivia(fallbackTrivia(today, todayKey));
-          setError('AIネタの取得に失敗したため、代替ネタを表示しています。');
+          setTrivia(null);
+          setError('AIネタの取得に失敗しました。後でもう一度お試しください。');
         }
       } finally {
         if (isMounted) setIsLoading(false);
