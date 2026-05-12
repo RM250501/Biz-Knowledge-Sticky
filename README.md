@@ -207,7 +207,7 @@ import { useGeolocation } from './hooks/useGeolocation';
 
 import { cn } from './lib/utils';
 import { getActualNewsTopics, getActualLocalInfo } from './services/geminiService';
-import { QUESTIONS, STATIC_TRIVIA, CATEGORY_LABELS } from './types';
+import { QUESTIONS, CATEGORY_LABELS } from './types';
 ```
 
 ### npm install で失敗したとき

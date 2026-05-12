@@ -26,7 +26,7 @@ export default defineConfig(({mode}) => {
       hmr: process.env.DISABLE_HMR !== 'true',
       proxy: {
         '/api': {
-          target: 'http://localhost:8787',
+          target: `http://localhost:${env.TRIVIA_API_PORT || 8787}`,
           changeOrigin: true,
         },
       },

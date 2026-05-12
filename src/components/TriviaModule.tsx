@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, MessageSquare, History, Check, Smile, Frown, Meh, User, CheckCircle2 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { Trivia, TriviaLog, UserStats, STATIC_TRIVIA } from '../types';
+import { Trivia, TriviaLog, UserStats } from '../types';
 
 const DAILY_TRIVIA_CACHE_KEY_PREFIX = 'biz_knowledge_daily_trivia_v2';
 const BROWSER_ID_KEY = 'biz_knowledge_browser_id_v1';
@@ -20,11 +20,15 @@ function toLocalDateKey(date: Date) {
 }
 
 function fallbackTrivia(today: Date, todayKey: string): Trivia {
-  const dayIdx = today.getDate() % STATIC_TRIVIA.length;
-  const triviaData = STATIC_TRIVIA[dayIdx];
+  // AI 取得失敗時の generic fallback
   return {
-    ...triviaData,
     id: `fallback-${todayKey}`,
+    category: 'その他',
+    title: `本日の雑学 (${todayKey})`,
+    explanation: 'AI 雑学の取得に失敗しました。サーバーを確認してください。',
+    doyaPoint: '申し訳ありません。後でもう一度お試しください。',
+    starter: 'ちょっと時間をおいて、もう一度アクセスしてみてください。',
+    target: ['同僚', '友人'],
     date: todayKey,
   };
 }
@@ -67,10 +71,14 @@ export const TriviaModule = ({ stats, onUpdateStats }: TriviaModuleProps) => {
   const [trivia, setTrivia] = useState<Trivia | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugRefreshError, setDebugRefreshError] = useState<string | null>(null);
   // 反応ログ入力フォームの表示状態。
   const [showLogForm, setShowLogForm] = useState(false);
   const [logNote, setLogNote] = useState("");
   const [logReaction, setLogReaction] = useState<'funny' | 'failed' | 'known'>('funny');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const debugMode = import.meta.env.VITE_DEBUG_MODE === 'true';
+  const urlDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
 
   useEffect(() => {
     let isMounted = true;
@@ -118,6 +126,46 @@ export const TriviaModule = ({ stats, onUpdateStats }: TriviaModuleProps) => {
       isMounted = false;
     };
   }, []);
+
+  const handleDebugRefresh = async () => {
+    setIsRefreshing(true);
+    setDebugRefreshError(null);
+    try {
+      const today = new Date();
+      const todayKey = toLocalDateKey(today);
+      const browserId = getBrowserId();
+
+      const response = await fetch('/api/trivia/assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ browserId, date: todayKey, refresh: true }),
+      });
+
+      if (!response.ok) {
+        const responseText = await response.text().catch(() => '');
+        throw new Error(`API error: ${response.status}${responseText ? ` / ${responseText}` : ''}`);
+      }
+
+      const data = await response.json();
+      const freshTrivia = data?.trivia as Trivia;
+
+      if (freshTrivia) {
+        setTrivia(freshTrivia);
+        const dailyCacheKey = `${DAILY_TRIVIA_CACHE_KEY_PREFIX}_${browserId}`;
+        localStorage.setItem(
+          dailyCacheKey,
+          JSON.stringify({ date: todayKey, trivia: freshTrivia } satisfies DailyTriviaCache)
+        );
+        setShowLogForm(false);
+      }
+    } catch (err) {
+      console.error('Debug refresh failed:', err);
+      const message = err instanceof Error ? err.message : String(err);
+      setDebugRefreshError(`新しいネタの取得に失敗しました: ${message}`);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleLogSubmit = () => {
     if (!trivia) return;
@@ -168,7 +216,27 @@ export const TriviaModule = ({ stats, onUpdateStats }: TriviaModuleProps) => {
   const hasTalked = stats.triviaLogs.some(log => log.triviaId === trivia.id);
 
   return (
-    <div className="max-w-3xl mx-auto font-serif">
+    <>
+      {(debugMode || urlDebug) && (
+        <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 1000 }}>
+          <button
+            id="debug-trivia-button"
+            onClick={handleDebugRefresh}
+            disabled={isRefreshing}
+            className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded border border-yellow-200 text-xs"
+            aria-label="debug-get-new-trivia"
+          >
+            {isRefreshing ? '取得中...' : '🔄 新ネタ (DEBUG)'}
+          </button>
+        {debugRefreshError && (
+          <div className="mt-2 max-w-xs rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700 shadow-sm">
+            {debugRefreshError}
+          </div>
+        )}
+        </div>
+      )}
+
+      <div className="max-w-3xl mx-auto font-serif">
       <div className="bg-[#fdfdfb] p-10 rounded-[40px] shadow-sm border border-[#e8e8e0] relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-50 rounded-full -mr-16 -mt-16 opacity-50" />
         
@@ -241,6 +309,8 @@ export const TriviaModule = ({ stats, onUpdateStats }: TriviaModuleProps) => {
               </div>
             )}
           </div>
+
+          
         </div>
       </div>
 
@@ -273,6 +343,8 @@ export const TriviaModule = ({ stats, onUpdateStats }: TriviaModuleProps) => {
               ))}
             </div>
             <textarea
+              id="trivia-log-note"
+              name="triviaLogNote"
               value={logNote}
               onChange={(e) => setLogNote(e.target.value)}
               placeholder="メモ（相手の反応など）"
@@ -335,5 +407,6 @@ export const TriviaModule = ({ stats, onUpdateStats }: TriviaModuleProps) => {
         </div>
       )}
     </div>
+    </>
   );
 };
