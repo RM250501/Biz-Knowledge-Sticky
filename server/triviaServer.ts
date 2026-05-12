@@ -1,6 +1,7 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import initSqlJs from 'sql.js';
@@ -17,14 +18,6 @@ type Trivia = {
   starter: string;
   target: string[];
   date: string;
-};
-
-type DailyRecord = {
-  assignedByBrowser: Record<string, Trivia>;
-};
-
-type TriviaState = {
-  byDate: Record<string, DailyRecord>;
 };
 
 const PORT = Number(process.env.TRIVIA_API_PORT || 8787);
@@ -115,89 +108,6 @@ function hashString(input: string) {
   return hash;
 }
 
-const STATIC_TRIVIA_POOL: Omit<Trivia, 'id' | 'date'>[] = [
-  {
-    category: '言葉の由来',
-    title: '「サボる」の語源はフランス語',
-    explanation: '「サボタージュ」が由来で、語源はフランス語の木靴「sabot」に由来するとされます。',
-    doyaPoint: '身近な言葉が外国語由来だと会話が盛り上がる。',
-    starter: '「サボる」って実はフランス語由来って知ってた？',
-    target: ['同僚', '友人']
-  },
-  {
-    category: '生き物の不思議',
-    title: 'パンダの「第6の指」は手首の骨',
-    explanation: '竹をつかむために、手首の骨が発達して指のように機能しています。',
-    doyaPoint: '指が多いのではなく骨の使い方が進化した点が面白い。',
-    starter: 'パンダの指って実は普通と違うんだよ。',
-    target: ['家族', '友人']
-  },
-  {
-    category: '食べ物・料理',
-    title: 'イチゴの粒は実、赤い部分は花托',
-    explanation: '赤い部分は花托で、表面の粒の一つ一つが果実です。',
-    doyaPoint: '見た目の常識が逆転する食品トリビア。',
-    starter: 'イチゴって、実は赤い部分が果実じゃないんだって。',
-    target: ['家族', '同僚']
-  },
-  {
-    category: '科学の逆説',
-    title: '熱いお湯が先に凍ることがある',
-    explanation: '条件によっては温かい水が冷たい水より先に凍る「ムペンバ効果」が知られています。',
-    doyaPoint: '直感に反する科学現象は記憶に残りやすい。',
-    starter: '冷たい水より熱い水が先に凍ることがあるって知ってた？',
-    target: ['同僚', '友人']
-  },
-  {
-    category: '心理学の小ネタ',
-    title: '選択肢が多すぎると決められなくなる',
-    explanation: '心理学では選択肢過多が意思決定を遅らせることが示されています。',
-    doyaPoint: '会議で案を絞る理由を説明しやすい。',
-    starter: '案が多すぎると逆に決めにくいの、心理学でも有名なんだ。',
-    target: ['同僚', '友人']
-  },
-  {
-    category: '地理・地名',
-    title: '東京駅は丸の内側が「西口」',
-    explanation: '地図上で皇居側が西にあたるため、丸の内側は西口扱いです。',
-    doyaPoint: '日常の場所に地理の理由があると印象に残る。',
-    starter: '東京駅の丸の内側って、実は西口扱いなんだよ。',
-    target: ['同僚', '家族']
-  },
-  {
-    category: '制度トリビア',
-    title: '日本の紙幣は約20年で刷新される傾向',
-    explanation: '偽造防止技術の更新や社会状況に応じて、紙幣デザインは周期的に変更されます。',
-    doyaPoint: 'ニュースと絡めて雑談しやすい時事ネタ。',
-    starter: 'お札のデザインって、だいたい20年くらいで変わる傾向があるんだ。',
-    target: ['同僚', '友人']
-  },
-  {
-    category: '道具の豆知識',
-    title: 'ホチキスは商品名由来で、一般名はステープラー',
-    explanation: '日本で普及した商品名が一般化し、今も通称として広く使われています。',
-    doyaPoint: '普段使う言葉の背景を知ると印象が変わる。',
-    starter: 'ホチキスって実は商品名由来なんだよ。',
-    target: ['同僚', '友人']
-  },
-  {
-    category: '歴史・偉人',
-    title: 'ナポレオンは平均身長だった',
-    explanation: '当時の単位差や記録解釈の違いで「小柄」イメージが広まったとされます。',
-    doyaPoint: '有名な先入観が覆る歴史トリビア。',
-    starter: 'ナポレオンって実は当時としては平均身長だったらしいよ。',
-    target: ['友人', '家族']
-  },
-  {
-    category: '言語',
-    title: '「了解しました」は目上には避けることが多い',
-    explanation: 'ビジネスでは「承知しました」「かしこまりました」がより丁寧とされます。',
-    doyaPoint: 'すぐ使える実践的な会話ネタ。',
-    starter: 'ビジネスだと「了解しました」より丁寧な言い方があるんだ。',
-    target: ['同僚', '友人']
-  }
-];
-
 async function getAssignedFromDb(browserId: string, dateKey: string): Promise<Trivia | null> {
   await initDb();
   const stmt = db.prepare('SELECT * FROM trivia_assignments WHERE browserId = :b AND date = :d');
@@ -223,22 +133,48 @@ async function getAssignedFromDb(browserId: string, dateKey: string): Promise<Tr
 
 async function insertAssignmentToDb(trivia: Trivia, browserId: string) {
   await initDb();
-  const stmt = db.prepare(`INSERT INTO trivia_assignments (id, browserId, date, category, title, explanation, doyaPoint, starter, target) VALUES (:id, :b, :d, :cat, :title, :exp, :doya, :starter, :target)`);
-  stmt.bind({
-    ':id': trivia.id,
-    ':b': browserId,
-    ':d': trivia.date,
-    ':cat': trivia.category,
-    ':title': trivia.title,
-    ':exp': trivia.explanation,
-    ':doya': trivia.doyaPoint,
-    ':starter': trivia.starter,
-    ':target': JSON.stringify(trivia.target),
-  });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const candidate = attempt === 0
+      ? trivia
+      : { ...trivia, id: `ai-${trivia.date}-retry-${randomUUID()}` };
+
+    try {
+      const stmt = db.prepare(`INSERT INTO trivia_assignments (id, browserId, date, category, title, explanation, doyaPoint, starter, target) VALUES (:id, :b, :d, :cat, :title, :exp, :doya, :starter, :target)`);
+      stmt.bind({
+        ':id': candidate.id,
+        ':b': browserId,
+        ':d': candidate.date,
+        ':cat': candidate.category,
+        ':title': candidate.title,
+        ':exp': candidate.explanation,
+        ':doya': candidate.doyaPoint,
+        ':starter': candidate.starter,
+        ':target': JSON.stringify(candidate.target),
+      });
+      stmt.run();
+      stmt.free();
+
+      // persist to file
+      const data = db.export();
+      fs.writeFileSync(DB_FILE, Buffer.from(data));
+      return;
+    } catch (error: any) {
+      const message = String(error?.message || '');
+      if (!message.includes('UNIQUE constraint failed: trivia_assignments.id') || attempt === 2) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error('Failed to insert trivia assignment after retries');
+}
+
+async function deleteAssignmentForBrowserDate(browserId: string, dateKey: string) {
+  await initDb();
+  const stmt = db.prepare('DELETE FROM trivia_assignments WHERE browserId = :b AND date = :d');
+  stmt.bind({ ':b': browserId, ':d': dateKey });
   stmt.run();
   stmt.free();
-
-  // persist to file
   const data = db.export();
   fs.writeFileSync(DB_FILE, Buffer.from(data));
 }
@@ -268,7 +204,7 @@ async function pruneOldEntries(cutoffKey: string) {
 
 function sanitizeTrivia(input: any, dateKey: string, idSeed: string): Trivia {
   return {
-    id: `ai-${dateKey}-${idSeed}`,
+    id: `ai-${dateKey}-${idSeed}-${randomUUID()}`,
     category: input?.category || 'AI雑学',
     title: input?.title || `今日の雑学 ${idSeed}`,
     explanation: input?.explanation || '雑学の生成に失敗したため、簡易説明を表示しています。',
@@ -321,6 +257,8 @@ async function generateAITrivia(dateKey: string, browserId: string, avoidTitles:
 - 既出タイトルに類似しないこと
 - 必須テーマに必ず沿うこと
 - 日本語で書くこと
+- 事実関係は、一般的に広く知られているものだけに限定すること
+- 断定が難しい固有名詞・年代・由来は避けること
 `;
 
   const response = await ai.models.generateContent({
@@ -346,31 +284,55 @@ async function generateAITrivia(dateKey: string, browserId: string, avoidTitles:
   return JSON.parse(response.text || '{}');
 }
 
-function generateGuaranteedUniqueFallback(dateKey: string, usedTitles: Set<string>, variantIndex: number): Trivia {
-  for (let i = 0; i < STATIC_TRIVIA_POOL.length; i += 1) {
-    const idx = (variantIndex + i) % STATIC_TRIVIA_POOL.length;
-    const candidate = STATIC_TRIVIA_POOL[idx];
-    if (!usedTitles.has(normalizeTitle(candidate.title))) {
-      return {
-        id: `fb-${dateKey}-${idx}`,
-        date: dateKey,
-        ...candidate,
-      };
-    }
-  }
+type FactCheckResult = {
+  approved: boolean;
+  reason: string;
+};
 
-  // 全候補使用済みでも連番タイトルで一意を保証。
-  const seq = usedTitles.size + 1;
+async function verifyAITrivia(trivia: Trivia) {
+  const ai = getGenAI();
+  const prompt = `
+あなたは事実確認担当です。次の雑学に含まれる内容が、一般的に広く知られている事実だけで構成されているかを判定してください。
+
+判定基準:
+- 断定が難しい固有名詞、年代、語源、由来、数値が含まれていれば不承認
+- 曖昧さが少しでもある場合は不承認
+- 雑学として面白くても、真偽に自信がないなら不承認
+
+雑学:
+タイトル: ${trivia.title}
+説明: ${trivia.explanation}
+ドヤ顔ポイント: ${trivia.doyaPoint}
+切り出し: ${trivia.starter}
+
+以下のJSONで返してください。
+{
+  "approved": true or false,
+  "reason": "1文の理由"
+}
+`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: prompt,
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'OBJECT',
+        properties: {
+          approved: { type: 'BOOLEAN' },
+          reason: { type: 'STRING' }
+        },
+        required: ['approved', 'reason']
+      }
+    }
+  });
+
+  const parsed = JSON.parse(response.text || '{}');
   return {
-    id: `gen-${dateKey}-${seq}`,
-    category: '日次配布ネタ',
-    title: `日次限定トリビア ${seq}`,
-    explanation: '本日の配布枠が埋まったため、重複回避用のユニークトリビアを生成しました。',
-    doyaPoint: 'このタイトル番号は当日中に重複しません。',
-    starter: '今日限定で配られたネタなんだけど、聞いてみる？',
-    target: ['同僚', '友人'],
-    date: dateKey,
-  };
+    approved: parsed?.approved === true,
+    reason: String(parsed?.reason || 'fact check failed'),
+  } satisfies FactCheckResult;
 }
 
 let writeQueue = Promise.resolve();
@@ -384,20 +346,37 @@ app.post('/api/trivia/assign', async (req, res) => {
   const dateKey = req.body?.date && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date)
     ? req.body.date
     : toDateKey(new Date());
+  const refresh = req.body?.refresh === true;
 
   if (!browserId) {
     res.status(400).json({ error: 'browserId is required' });
     return;
   }
 
+  // If an assignment already exists for this browser/date and caller did not request refresh,
+  // return the existing assignment to avoid duplicate inserts and needless AI calls.
+  try {
+    const existing = await getAssignedFromDb(browserId, dateKey);
+    if (existing && !refresh) {
+      res.json({ trivia: existing, source: 'cached' });
+      return;
+    }
+  } catch (err) {
+    console.error('Failed checking existing assignment:', err);
+    // continue to attempt assignment; errors here shouldn't block the flow
+  }
+
   writeQueue = writeQueue.then(async () => {
-    // In AI-only mode we do not return prior assignments; always attempt fresh AI generation.
+    if (refresh) {
+      await deleteAssignmentForBrowserDate(browserId, dateKey);
+    }
+
     const usedTitles = await getUsedTitlesFromDb(dateKey);
     const variantIndex = hashString(`${dateKey}-${browserId}`) % 12;
 
     let assigned: Trivia | null = null;
 
-    // Try multiple times to get a unique AI-generated trivia.
+    // Try multiple times to get a unique AI-generated trivia that also passes fact check.
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
         const aiTrivia = await generateAITrivia(
@@ -413,16 +392,21 @@ app.post('/api/trivia/assign', async (req, res) => {
           continue;
         }
 
-        assigned = sanitizeTrivia(aiTrivia, dateKey, `${browserId.slice(-6)}-${attempt}`);
+        const candidate = sanitizeTrivia(aiTrivia, dateKey, `${browserId.slice(-6)}-${attempt}`);
+        const factCheck = await verifyAITrivia(candidate);
+        if (!factCheck.approved) {
+          continue;
+        }
+
+        assigned = candidate;
         break;
-      } catch (error) {
-        console.error('AI trivia generation failed:', error);
+      } catch {
+        // retry with a different prompt variant
       }
     }
 
     if (!assigned) {
-      // Complete AI mode: if AI cannot produce a unique trivia, return error.
-      res.status(503).json({ error: 'ai_unavailable', message: 'AI trivia generation failed; try again later.' });
+      res.status(503).json({ error: 'ai_unavailable', message: 'AI trivia generation failed or failed fact check; try again later.' });
       return;
     }
 
@@ -436,7 +420,7 @@ app.post('/api/trivia/assign', async (req, res) => {
 
     res.json({ trivia: assigned, source: 'new' });
   }).catch((error) => {
-    console.error('Assignment queue failed:', error);
+    console.error('[trivia-api] assignment failed:', error);
     if (!res.headersSent) {
       res.status(500).json({ error: 'internal_error' });
     }

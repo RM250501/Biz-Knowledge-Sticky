@@ -116,8 +116,5 @@ export const INITIAL_STATS: UserStats = {
   lastLoginDate: '',
 };
 
-// 日替わり表示用の固定雑学データ（ここにコンテンツを追加）
-export const STATIC_TRIVIA: Trivia[] = [];
-
 // QuizModule が参照する問題データ本体（ここにコンテンツを追加）
 export const QUESTIONS: Question[] = [];

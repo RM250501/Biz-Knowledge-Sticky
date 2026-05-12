@@ -109,7 +109,6 @@
 - 定数:
   - `CATEGORY_LABELS`: カテゴリ表示名の辞書。
   - `INITIAL_STATS`: 初期状態。
-  - `STATIC_TRIVIA`: 雑学の固定データ。
   - `QUESTIONS`: クイズ問題データ本体。
 
 ## src/components
@@ -164,7 +163,8 @@
 ### src/components/TriviaModule.tsx
 - 雑学カード表示とアウトプット記録。
 - 初期表示:
-  日付を基準に `STATIC_TRIVIA` から当日ネタを選択。
+  サーバーの `/api/trivia/assign` から当日のブラウザ割り当てトリビアを取得。
+  同日同ブラウザは常に同じネタ、別ブラウザには異なるネタを配布。
 - `hasTalked`:
   そのネタを既に記録済みかを判定。
 - `handleLogSubmit()`:
