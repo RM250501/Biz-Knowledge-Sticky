@@ -48,12 +48,17 @@ export default function App() {
   const [showStreakAnim, setShowStreakAnim] = useState(false);
 
   const startTimedQuiz = () => {
-    setQuizPreset({ sourceMode: 'category', endMode: 'time', durationMinutes: 5, category: 'english' });
+    setQuizPreset({ sourceMode: 'random', endMode: 'time', durationMinutes: 3 });
     setActiveTab('learning');
   };
 
   const startRandomQuiz = () => {
     setQuizPreset({ sourceMode: 'random', endMode: 'time', durationMinutes: 5 });
+    setActiveTab('learning');
+  };
+
+  const startCountQuiz = () => {
+    setQuizPreset({ sourceMode: 'random', endMode: 'count', questionTarget: 10 });
     setActiveTab('learning');
   };
 
@@ -178,6 +183,7 @@ export default function App() {
                   stats={stats}
                   onStartTimedQuiz={startTimedQuiz}
                   onStartRandomQuiz={startRandomQuiz}
+                  onStartCountQuiz={startCountQuiz}
                 />
               )}
               {activeTab === 'learning' && (

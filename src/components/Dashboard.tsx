@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { User, TrendingUp, Award, Calendar as CalendarIcon, Sparkles, Shuffle, Timer, Eye, EyeOff } from 'lucide-react';
+import { User, TrendingUp, Award, Calendar as CalendarIcon, Sparkles, Shuffle, Timer, Eye, EyeOff, ListChecks } from 'lucide-react';
 import { 
   LineChart, 
   Line, 
@@ -17,7 +17,7 @@ import { UserStats, CATEGORY_LABELS } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
-export const Dashboard = ({ stats, onStartTimedQuiz, onStartRandomQuiz }: { stats: UserStats; onStartTimedQuiz: () => void; onStartRandomQuiz: () => void }) => {
+export const Dashboard = ({ stats, onStartTimedQuiz, onStartRandomQuiz, onStartCountQuiz }: { stats: UserStats; onStartTimedQuiz: () => void; onStartRandomQuiz: () => void; onStartCountQuiz: () => void }) => {
   // プロファイル表示とカレンダー表示の切替状態。
   const [showCalendar, setShowCalendar] = useState(false);
   // 文字を抑えた簡易表示を既定にする。
@@ -131,13 +131,13 @@ export const Dashboard = ({ stats, onStartTimedQuiz, onStartRandomQuiz }: { stat
               onClick={onStartTimedQuiz}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-900 text-white text-sm font-bold hover:bg-gray-800 transition-colors"
             >
-              <Timer size={14} /> 5分ドリル
+              <Timer size={14} /> 3分ドリル
             </button>
             <button
-              onClick={onStartRandomQuiz}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white text-gray-800 text-sm font-bold border border-gray-200 hover:bg-gray-50 transition-colors"
+              onClick={onStartCountQuiz}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-100 text-blue-800 text-sm font-bold border border-blue-200 hover:bg-blue-50 transition-colors"
             >
-              <Shuffle size={14} /> ランダム出題
+              <ListChecks size={14} /> 10問ドリル
             </button>
           </div>
         </div>
