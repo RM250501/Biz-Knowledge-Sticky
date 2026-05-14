@@ -254,3 +254,109 @@ export async function getDailyTrivia(dayOfWeek: number, options: DailyTriviaOpti
     return null;
   }
 }
+
+// セッション単位のクイズ結果からレポート（正誤表・傾向・原因・学習提案）を生成する。
+export async function generateQuizReport(sessionLog: Array<any>) {
+  try {
+    // テスト環境で API キーが未設定の場合はローカルでモックレポートを返す
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      const wrongByCategory: Record<string, number> = {};
+      sessionLog.forEach((s: any) => {
+        if (!s.isCorrect) wrongByCategory[s.category] = (wrongByCategory[s.category] || 0) + 1;
+      });
+      const total = sessionLog.length;
+      const correct = sessionLog.filter((s:any)=>s.isCorrect).length;
+      const topWrong = Object.entries(wrongByCategory).sort((a,b)=>b[1]-a[1])[0];
+      const topCategoryNote = topWrong ? `${topWrong[0]}で${topWrong[1]}件間違い` : '';
+      const comment = correct === 0 ? '今は基礎から丁寧に復習しましょう。' : (correct === total ? 'よくできました！引き続き維持しましょう。' : `${correct}/${total}問正解。${topCategoryNote}`);
+      return {
+        summary: `全${total}問中 ${correct}問正解。`,
+        correctnessTable: sessionLog.map((s: any) => ({ id: s.questionId, question: s.question, userAnswer: s.userAnswer, correctAnswer: s.correctAnswer, isCorrect: s.isCorrect, category: s.category })),
+        comment
+      };
+    }
+
+    const ai = getGenAI();
+
+    const summaryItems = sessionLog.map((s: any, idx: number) => {
+      return `${idx + 1}. 問題ID: ${s.questionId}｜カテゴリ: ${s.category}｜正解: ${s.correctAnswer}｜回答: ${s.userAnswer}｜結果: ${s.isCorrect ? '正解' : '不正解'}`;
+    }).join('\n');
+
+    const prompt = `
+      あなたはビジネス学習支援の専門家です。以下はユーザーのクイズセッションの回答ログです。ログを読み、以下のJSON形式で応答してください。
+      1) summary: セッション全体の短い要約（日本語、~60文字）
+      2) correctnessTable: 各問題の要約（配列）
+      3) comment: 正答数や分野に応じた短い一言コメント（日本語、20〜60文字）
+
+      入力ログ:
+      ${summaryItems}
+
+      出力JSONのスキーマ:
+      {
+        "summary": "STRING",
+        "correctnessTable": [{"id":"STRING","question":"STRING","userAnswer":"STRING","correctAnswer":"STRING","isCorrect":"BOOLEAN","category":"STRING"}],
+        "comment": "STRING"
+      }
+
+      制約:
+      - 日本語で出力すること。
+      - JSONのみを返すこと。他の説明文は含めないでください。
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-pro-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        // 応答をスキーマに沿ったJSONで受け取る
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            summary: { type: "STRING" },
+            correctnessTable: {
+              type: "ARRAY",
+              items: {
+                type: "OBJECT",
+                properties: {
+                  id: { type: "STRING" },
+                  question: { type: "STRING" },
+                  userAnswer: { type: "STRING" },
+                  correctAnswer: { type: "STRING" },
+                  isCorrect: { type: "BOOLEAN" },
+                  category: { type: "STRING" }
+                }
+              }
+            },
+            comment: { type: "STRING" }
+          },
+          required: ["summary", "correctnessTable", "comment"]
+        }
+      }
+    });
+
+    const text = response.text;
+    return JSON.parse(text || "{}");
+  } catch (error) {
+    console.error("generateQuizReport Error:", error);
+    // フォールバック: AI呼び出しに失敗した場合でもモックレポートを返す
+    try {
+      const wrongByCategory: Record<string, number> = {};
+      sessionLog.forEach((s: any) => {
+        if (!s.isCorrect) wrongByCategory[s.category] = (wrongByCategory[s.category] || 0) + 1;
+      });
+      const total = sessionLog.length;
+      const correct = sessionLog.filter((s:any)=>s.isCorrect).length;
+      const topWrong = Object.entries(wrongByCategory).sort((a,b)=>b[1]-a[1])[0];
+      const topCategoryNote = topWrong ? `${topWrong[0]}で${topWrong[1]}件間違い` : '';
+      const comment = correct === 0 ? '今は基礎から丁寧に復習しましょう。' : (correct === total ? 'よくできました！引き続き維持しましょう。' : `${correct}/${total}問正解。${topCategoryNote}`);
+      return {
+        summary: `全${total}問中 ${correct}問正解。（AI呼び出しエラーで代替生成）`,
+        correctnessTable: sessionLog.map((s: any) => ({ id: s.questionId, question: s.question, userAnswer: s.userAnswer, correctAnswer: s.correctAnswer, isCorrect: s.isCorrect, category: s.category })),
+        comment
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+}

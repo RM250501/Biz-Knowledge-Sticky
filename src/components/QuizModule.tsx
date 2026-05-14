@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BookOpen, ChevronRight, Clock, CheckCircle2, AlertCircle, Award, Shuffle, Timer, ListChecks, Settings2, RotateCcw } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Question, CATEGORY_LABELS, QUESTIONS } from '../types';
+import { generateQuizReport } from '../services/geminiService';
 
 type QuizSourceMode = 'category' | 'random';
 type QuizEndMode = 'time' | 'count';
@@ -49,6 +50,11 @@ export const QuizModule = ({ onComplete, launchPreset, onPresetConsumed }: QuizM
   const [correctCount, setCorrectCount] = useState(0);
   // セッション全体の回答数。
   const [answeredCount, setAnsweredCount] = useState(0);
+  // セッション中の全回答ログ（AIレポート用）
+  const [sessionLog, setSessionLog] = useState<Array<any>>([]);
+  // AIで生成されたセッションレポート
+  const [sessionReport, setSessionReport] = useState<any>(null);
+  const [reportLoading, setReportLoading] = useState(false);
   // 結果画面で表示するメッセージ。
   const [summaryMessage, setSummaryMessage] = useState<string>('');
 
@@ -65,6 +71,19 @@ export const QuizModule = ({ onComplete, launchPreset, onPresetConsumed }: QuizM
     const nextDurationMinutes = preset?.durationMinutes ?? durationMinutes;
     const nextQuestionTarget = preset?.questionTarget ?? questionTarget;
     const nextCategory = preset?.category ?? selectedCategory;
+    // クイックテスト用: URL クエリに quickTest=1 がある場合は出題数 1 問（終了条件=count）にする
+    try {
+      if (typeof window !== 'undefined') {
+        const qp = new URLSearchParams(window.location.search);
+        if (qp.get('quickTest') === '1') {
+          // override
+          // eslint-disable-next-line no-param-reassign
+          // (use local vars instead)
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
 
     const sourcePool = nextSourceMode === 'random'
       ? QUESTIONS
@@ -78,14 +97,27 @@ export const QuizModule = ({ onComplete, launchPreset, onPresetConsumed }: QuizM
     }
 
     const shuffledPool = [...sourcePool].sort(() => Math.random() - 0.5);
-    const sessionPool = nextEndMode === 'count'
-      ? shuffledPool.slice(0, Math.min(nextQuestionTarget, shuffledPool.length))
+    // クイックテスト時は query override
+    let effectiveEndMode = nextEndMode;
+    let effectiveQuestionTarget = nextQuestionTarget;
+    try {
+      if (typeof window !== 'undefined') {
+        const qp = new URLSearchParams(window.location.search);
+        if (qp.get('quickTest') === '1') {
+          effectiveEndMode = 'count';
+          effectiveQuestionTarget = 1;
+        }
+      }
+    } catch (e) {}
+
+    const sessionPool = effectiveEndMode === 'count'
+      ? shuffledPool.slice(0, Math.min(effectiveQuestionTarget, shuffledPool.length))
       : shuffledPool;
 
     setSourceMode(nextSourceMode);
-    setEndMode(nextEndMode);
+    setEndMode(effectiveEndMode);
     setDurationMinutes(nextDurationMinutes);
-    setQuestionTarget(nextQuestionTarget);
+    setQuestionTarget(effectiveQuestionTarget);
     setSelectedCategory(nextCategory || 'english');
     setShuffledQuestions(sessionPool);
     setCurrentIdx(0);
@@ -94,6 +126,8 @@ export const QuizModule = ({ onComplete, launchPreset, onPresetConsumed }: QuizM
     setAiFeedback(null);
     setCorrectCount(0);
     setAnsweredCount(0);
+    setSessionLog([]);
+    setSessionReport(null);
     setSummaryMessage('');
     setTimeLeft(nextEndMode === 'time' ? nextDurationMinutes * 60 : 0);
     setSessionState('quiz');
@@ -106,6 +140,24 @@ export const QuizModule = ({ onComplete, launchPreset, onPresetConsumed }: QuizM
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [launchPreset]);
+
+  // セッション終了時に AI レポートを生成する
+  useEffect(() => {
+    if (sessionState === 'summary' && sessionReport == null && sessionLog.length > 0) {
+      (async () => {
+        try {
+          setReportLoading(true);
+          const report = await generateQuizReport(sessionLog);
+          setSessionReport(report);
+        } catch (e) {
+          console.error('Report generation failed', e);
+          setSessionReport(null);
+        } finally {
+          setReportLoading(false);
+        }
+      })();
+    }
+  }, [sessionState, sessionLog, sessionReport]);
 
   const currentQuestion = shuffledQuestions[currentIdx];
 
@@ -144,6 +196,17 @@ export const QuizModule = ({ onComplete, launchPreset, onPresetConsumed }: QuizM
         console.error("Error in onComplete:", e);
       }
     }
+    // セッションログに追加
+    const logItem = {
+      questionId: currentQuestion.id,
+      question: currentQuestion.question,
+      category: currentQuestion.category,
+      correctAnswer: currentQuestion.options[currentQuestion.correctIndex] || '',
+      userAnswer: currentQuestion.options[idx] || '',
+      isCorrect,
+      timestamp: new Date().toISOString()
+    };
+    setSessionLog(prev => [...prev, logItem]);
   };
 
   const nextQuestion = () => {
@@ -165,6 +228,8 @@ export const QuizModule = ({ onComplete, launchPreset, onPresetConsumed }: QuizM
     setSessionState('setup');
     setSummaryMessage('');
     resetQuestionState();
+    setSessionLog([]);
+    setSessionReport(null);
   };
 
   if (sessionState === 'summary') {
@@ -208,6 +273,73 @@ export const QuizModule = ({ onComplete, launchPreset, onPresetConsumed }: QuizM
           >
             <ChevronRight size={18} /> 同じ設定でもう一度
           </button>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+          <div className="flex items-center gap-2 text-gray-500 text-xs font-black uppercase tracking-[0.2em]">
+            <Settings2 size={14} /> セッションレポート
+          </div>
+          {reportLoading ? (
+            <p className="text-gray-500">レポートを生成中です…</p>
+          ) : sessionReport ? (
+            <div className="space-y-3">
+              <h3 className="text-lg font-bold text-gray-800">{sessionReport.summary}</h3>
+              {sessionReport.comment && <p className="text-sm text-gray-600 mt-1">{sessionReport.comment}</p>}
+
+              <div className="text-sm text-gray-700">
+                <div className="overflow-x-auto rounded-lg border border-gray-100 bg-white shadow-sm">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">カテゴリ</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">自分の回答</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">正解</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">結果</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-100">
+                      {(sessionReport.correctnessTable || []).map((r: any, i: number) => (
+                        <tr key={i} className="hover:bg-gray-50">
+                          <td className="px-3 py-3 align-top whitespace-nowrap">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{r.category}</span>
+                          </td>
+                          <td className="px-3 py-3 align-top whitespace-normal max-w-[45%]">{r.userAnswer}</td>
+                          <td className="px-3 py-3 align-top whitespace-normal max-w-[45%]">{r.correctAnswer}</td>
+                          <td className="px-3 py-3 align-top whitespace-nowrap">
+                            {r.isCorrect ? (
+                              <div className="inline-flex items-center gap-2 text-green-700 bg-green-50 px-2 py-1 rounded-full text-sm font-semibold">
+                                <CheckCircle2 size={16} /> <span>正解</span>
+                              </div>
+                            ) : (
+                              <div className="inline-flex items-center gap-2 text-red-700 bg-red-50 px-2 py-1 rounded-full text-sm font-semibold">
+                                <AlertCircle size={16} /> <span>不正解</span>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {sessionReport.comment && (
+                  <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 via-white to-white border-l-4 border-blue-400 rounded">
+                    <div className="flex items-start gap-3">
+                      <div className="text-blue-800">
+                        <CheckCircle2 size={20} />
+                      </div>
+                      <div>
+                        <div className="font-bold text-blue-900">AIコメント</div>
+                        <div className="text-blue-800 mt-1 text-sm leading-relaxed">{sessionReport.comment}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="text-gray-500">レポートはまだ生成されていません。</p>
+          )}
         </div>
       </div>
     );
