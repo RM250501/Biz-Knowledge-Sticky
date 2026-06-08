@@ -9,6 +9,8 @@ import {
   Award,
   AlertCircle,
   User,
+  Sun,
+  Moon,
   Flame
 } from 'lucide-react';
 
@@ -47,6 +49,14 @@ export default function App() {
   // ログイン連続日数更新時に一度だけ表示する演出。
   const [showStreakAnim, setShowStreakAnim] = useState(false);
 
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const stored = localStorage.getItem('theme');
+    if (stored === 'light' || stored === 'dark') {
+      return stored;
+    }
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
+
   const startTimedQuiz = () => {
     setQuizPreset({ sourceMode: 'random', endMode: 'time', durationMinutes: 3 });
     setActiveTab('learning');
@@ -74,6 +84,11 @@ export default function App() {
       }
     }
   }, [stats.loginStreak]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   return (
     <div className="h-screen w-screen bg-[#f8f8f8] overflow-hidden flex flex-col font-sans text-gray-900 relative">
@@ -126,6 +141,19 @@ export default function App() {
             <div className="text-sm font-black text-gray-700">{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
             <div className="text-[10px] text-gray-400 font-bold uppercase">{currentTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</div>
           </div>
+          <button
+            type="button"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            title={theme === 'dark' ? 'ライトモードへ' : 'ダークモードへ'}
+            aria-label={theme === 'dark' ? 'ライトモードへ切り替え' : 'ダークモードへ切り替え'}
+            className="h-10 w-10 rounded-full border border-gray-200 bg-white/70 flex items-center justify-center shadow-sm hover:scale-105 transition"
+          >
+            {theme === 'dark' ? (
+              <Sun size={16} className="text-amber-500" />
+            ) : (
+              <Moon size={16} className="text-gray-600" />
+            )}
+          </button>
           <div className="h-10 w-px bg-gray-200" />
           <div className="flex items-center gap-3">
             <div className="text-right">

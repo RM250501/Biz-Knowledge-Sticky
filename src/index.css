@@ -15,3 +15,198 @@
     @apply bg-[#5A5A40] text-white rounded-full px-6 py-3 tracking-wider transition-all hover:bg-[#4a4a35] active:scale-95;
   }
 }
+
+:root {
+  --app-bg: #f8f8f8;
+  --app-surface: #ffffff;
+  --app-text: #111827;
+  --app-muted: #9ca3af;
+  --app-border: #e5e7eb;
+  --app-subtle: rgba(255, 255, 255, 0.5);
+  --app-subtle-2: rgba(255, 255, 255, 0.3);
+  --app-avatar: #f3f4f6;
+}
+
+[data-theme="dark"] {
+  --app-bg: #050505;
+  --app-surface: #0f0f0f;
+  --app-surface-2: #171717;
+  --app-text: #f8f8f8;
+  --app-muted: #d4d4d4;
+  --app-border: rgba(255, 255, 255, 0.58);
+  --app-subtle: rgba(16, 16, 16, 0.88);
+  --app-subtle-2: rgba(10, 10, 10, 0.76);
+  --app-avatar: #141414;
+}
+
+/* Recharts / SVG chart adjustments for dark mode */
+[data-theme="dark"] .recharts-cartesian-grid line {
+  stroke: rgba(255,255,255,0.06) !important;
+}
+[data-theme="dark"] .recharts-cartesian-axis-tick line,
+[data-theme="dark"] .recharts-cartesian-axis-tick path {
+  stroke: rgba(255,255,255,0.06) !important;
+}
+[data-theme="dark"] .recharts-cartesian-axis-tick text,
+[data-theme="dark"] .recharts-xAxis text,
+[data-theme="dark"] .recharts-yAxis text {
+  fill: var(--app-muted) !important;
+}
+[data-theme="dark"] .recharts-line path,
+[data-theme="dark"] .recharts-area .recharts-area-curve,
+[data-theme="dark"] .recharts-area .recharts-area-base,
+[data-theme="dark"] .recharts-radar-polygon,
+[data-theme="dark"] .recharts-radar-area {
+  stroke-opacity: 0.95 !important;
+  fill-opacity: 0.06 !important;
+}
+[data-theme="dark"] .recharts-area .recharts-area-curve {
+  stroke: rgba(255,255,255,0.12) !important;
+}
+[data-theme="dark"] .recharts-line .recharts-line-curve {
+  stroke: rgba(255,255,255,0.9) !important;
+}
+[data-theme="dark"] .recharts-polar-grid .recharts-polar-grid-line,
+[data-theme="dark"] .recharts-polar-grid .recharts-polar-grid-circle {
+  stroke: rgba(255,255,255,0.06) !important;
+}
+[data-theme="dark"] .recharts-tooltip-wrapper {
+  background: rgba(0,0,0,0.6) !important;
+  color: var(--app-text) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+[data-theme="dark"] .recharts-legend-wrapper text {
+  fill: var(--app-muted) !important;
+}
+
+
+/* MenuSticky: keep border/text (tag) colors, but make the sticky background dark in dark mode */
+[data-theme="dark"] .bg-\[\#fff9c4\],
+[data-theme="dark"] .bg-\[\#e3f2fd\],
+[data-theme="dark"] .bg-\[\#e8f5e9\],
+[data-theme="dark"] .bg-\[\#fce4ec\],
+[data-theme="dark"] .bg-\[\#f3e5f5\] {
+  background-color: var(--app-surface) !important;
+}
+
+/* Make the sticky label (icon + title) white in dark mode while preserving tag/border colors */
+[data-theme="dark"] .menu-sticky-label {
+  color: #ffffff !important;
+}
+[data-theme="dark"] .menu-sticky-label svg {
+  color: #ffffff !important;
+}
+
+body {
+  background: var(--app-bg);
+  color: var(--app-text);
+}
+
+.bg-\[\#f8f8f8\] { background-color: var(--app-bg) !important; }
+.bg-white { background-color: var(--app-surface) !important; }
+.bg-white\/50 { background-color: var(--app-subtle) !important; }
+.bg-white\/30 { background-color: var(--app-subtle-2) !important; }
+.text-gray-900,
+.text-gray-800,
+.text-gray-700 { color: var(--app-text) !important; }
+.text-gray-500,
+.text-gray-400 { color: var(--app-muted) !important; }
+.border-gray-100,
+.border-gray-200,
+.border-gray-300,
+.border-white { border-color: var(--app-border) !important; }
+.bg-gray-100,
+.bg-gray-100\/50 { background-color: var(--app-avatar) !important; }
+.bg-gray-200 { background-color: var(--app-border) !important; }
+
+/* Broad overrides to force light surfaces to our dark surface and borders to white-ish */
+.bg-gray-50,
+.bg-gray-100,
+.bg-gray-200,
+.bg-gray-50\/60,
+.bg-gray-50, .bg-white,
+.bg-blue-50,
+.bg-blue-50\/80,
+.bg-yellow-50,
+.bg-yellow-100,
+.bg-orange-50,
+.bg-green-50,
+.bg-red-50,
+.bg-purple-50,
+.bg-gray-50\/60,
+.bg-white\/70,
+.bg-white\/80,
+.bg-white\/90,
+.bg-\[\#fdfdfb\],
+.bg-\[\#fffde7\],
+.bg-\[\#f1f8ff\],
+.bg-\[\#f1f8e9\],
+.bg-\[\#fdf2f7\],
+.bg-\[\#f8f1f9\],
+.bg-\[\#f4fbf4\],
+.bg-\[\#fffde7\] {
+  background-color: var(--app-surface) !important;
+  color: var(--app-text) !important;
+}
+
+/* Improve content card contrast in dark mode: make white/gray surfaces slightly lighter than page background */
+[data-theme="dark"] .bg-white,
+[data-theme="dark"] .bg-gray-50,
+[data-theme="dark"] .bg-gray-100,
+[data-theme="dark"] .bg-white\/70,
+[data-theme="dark"] .bg-white\/50,
+[data-theme="dark"] .bg-gray-50\/60 {
+  background-color: var(--app-surface-2) !important;
+  color: var(--app-text) !important;
+}
+
+[data-theme="dark"] .text-gray-600,
+[data-theme="dark"] .text-gray-500,
+[data-theme="dark"] .text-gray-400 {
+  color: var(--app-muted) !important;
+}
+
+/* Ensure headings are highly readable in dark mode */
+[data-theme="dark"] h1,
+[data-theme="dark"] h2,
+[data-theme="dark"] h3,
+[data-theme="dark"] h4,
+[data-theme="dark"] h5,
+[data-theme="dark"] h6,
+[data-theme="dark"] .text-4xl,
+[data-theme="dark"] .text-3xl,
+[data-theme="dark"] .text-2xl,
+[data-theme="dark"] .text-xl {
+  color: var(--app-text) !important;
+  opacity: 1 !important;
+  -webkit-text-stroke: 0px transparent; /* avoid faint stroke artifacts */
+}
+
+/* Force borders to be visible (white-ish) */
+.border-gray-50,
+.border-gray-100,
+.border-gray-200,
+.border-gray-300,
+.border-blue-100,
+.border-yellow-100,
+.border-orange-100,
+.border-slate-100,
+.border-amber-200,
+.border-dashed,
+.border-white,
+.border-\[\#e8e8e0\] {
+  border-color: var(--app-border) !important;
+}
+
+/* Badges & small chips */
+.px-3.py-1.bg-gray-100,
+.px-3.py-1.bg-white,
+.rounded-full.bg-gray-100,
+.rounded-full.bg-white,
+.bg-white\.\/20,
+.bg-white \/20 {
+  background-color: var(--app-subtle) !important;
+  color: var(--app-text) !important;
+}
+
