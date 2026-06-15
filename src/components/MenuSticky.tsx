@@ -34,14 +34,16 @@ export const MenuSticky = ({
       whileHover={{ x: 10, rotate: 1 }}
       whileTap={{ scale: 0.95 }}
       className={cn(
-        "w-full p-4 mb-4 text-left shadow-md border-l-4 transition-all relative group overflow-hidden",
+        "menu-sticky w-full p-4 mb-4 text-left shadow-md border-l-4 transition-all relative group overflow-hidden",
         colors[color],
         isActive ? "ring-2 ring-black/20 translate-x-4 shadow-lg" : "opacity-80 hover:opacity-100"
       )}
     >
       <div className="flex items-center gap-3">
-        <Icon size={20} />
-        <span className="font-bold text-sm uppercase tracking-tight">{title}</span>
+        <div className="menu-sticky-label flex items-center gap-3">
+          <Icon size={20} />
+          <span className="menu-sticky-title font-bold text-sm uppercase tracking-tight">{title}</span>
+        </div>
       </div>
       
       <motion.div 
