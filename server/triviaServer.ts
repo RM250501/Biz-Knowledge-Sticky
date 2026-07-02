@@ -108,6 +108,51 @@ function hashString(input: string) {
   return hash;
 }
 
+const SERVER_FALLBACK_TRIVIA: Array<Omit<Trivia, 'id' | 'date'>> = [
+  {
+    category: '雑学',
+    title: '富士山は日本最高峰',
+    explanation: '富士山は日本でいちばん高い山として知られています。標高は 3776m です。',
+    doyaPoint: '日本一の高さは、会話の切り出しに使いやすい定番ネタです。',
+    starter: 'そういえば、日本でいちばん高い山って知ってる？',
+    target: ['同僚', '友人'],
+  },
+  {
+    category: '雑学',
+    title: '1日は24時間',
+    explanation: '地球の自転により、私たちは 1 日を 24 時間として区切って生活しています。',
+    doyaPoint: '当たり前に見えて、時間の基準は地球の動きに支えられています。',
+    starter: '時間の区切りって、どうして 24 時間なんだろう？',
+    target: ['同僚', '友人'],
+  },
+  {
+    category: '雑学',
+    title: '紙は折ると強くなる',
+    explanation: '紙は薄くても、折り方や重ね方を工夫すると見た目以上の強さを出せます。',
+    doyaPoint: '身近な素材でも、形を変えるだけで性質が変わります。',
+    starter: '紙って、ただの紙でも結構すごいんだよ。',
+    target: ['同僚', '友人'],
+  },
+  {
+    category: '雑学',
+    title: '月は地球の衛星',
+    explanation: '月は地球の周りを回る唯一の自然衛星です。夜空で最も身近な天体のひとつです。',
+    doyaPoint: '天体の基本ネタは、幅広い相手に話しやすいのが強みです。',
+    starter: '月って、実は地球の衛星なんだよね。',
+    target: ['同僚', '友人'],
+  },
+];
+
+function buildFallbackTrivia(dateKey: string, browserId: string): Trivia {
+  const index = hashString(`${dateKey}-${browserId}`) % SERVER_FALLBACK_TRIVIA.length;
+  const selected = SERVER_FALLBACK_TRIVIA[index];
+  return {
+    id: `fallback-${dateKey}-${browserId.slice(-8)}-${index}-${randomUUID()}`,
+    date: dateKey,
+    ...selected,
+  };
+}
+
 async function getAssignedFromDb(browserId: string, dateKey: string): Promise<Trivia | null> {
   await initDb();
   const stmt = db.prepare('SELECT * FROM trivia_assignments WHERE browserId = :b AND date = :d');
@@ -235,30 +280,39 @@ async function generateAITrivia(dateKey: string, browserId: string, avoidTitles:
   const today = new Date(dateKey).toLocaleDateString('ja-JP');
 
   const prompt = `
-あなたは『明日のランチで話せるネタ帳』の編集者です。
-本日（${today}）向けに、重複しない雑学を1つ作ってください。
-ブラウザID: ${browserId}
-バリアント: ${variantIndex}
-試行: ${attempt}
-必須テーマ: ${selectedTheme}
-再利用禁止タイトル: ${(avoidTitles || []).join(' / ') || 'なし'}
+# 役割
+あなたは『明日のランチで話せるネタ帳』の優秀な編集者です。
+ユーザーから与えられたテーマに基づき、思わず明日誰かに話したくなる、新鮮で面白い雑学を1つだけ作成してください。
 
-以下のJSONを返してください。
+# コンテキスト情報
+- 本日の日付: ${today}
+- ブラウザID: ${browserId}
+- バリアント: ${variantIndex}
+- 試行回数: ${attempt}
+- 必須テーマ: ${selectedTheme}
+- 再利用禁止タイトル（これらに類似する内容は絶対に避けること）: ${(avoidTitles || []).join(' / ') || 'なし'}
+
+# 雑学作成のクオリティ基準
+1. 【意外性】「えっ、そうなの！？」という驚きや、身近なものの裏話であること。
+2. 【健全性】下ネタ、政治、宗教、不快感を与えるドロドロした雑学はNG。
+3. 【事実性】広く一般に知られている確かな事実であること（諸説ありすぎるグレーな歴史ネタや、真偽不明の都市伝説は避ける）。
+
+# 出力フォーマット
+必ず以下のJSON形式のみを出力してください。余計な挨拶や解説（「json」のマークダウンタグなど含む）は一切不要です。
+
 {
-  "category": "カテゴリ名",
-  "title": "タイトル",
-  "explanation": "3行程度の解説",
-  "doyaPoint": "盛り上がる一言",
-  "starter": "会話の切り出し",
-  "target": ["家族", "同僚", "友人"]
+  "category": "【必須テーマ】に合致する、キャッチーなカテゴリ名（10文字以内）",
+  "title": "思わず内容を聞きたくなる、引きのあるタイトル（20文字以内）",
+  "explanation": "スマホの画面でも読みやすい、100文字〜130文字程度（3行相当）の簡潔かつ分かりやすい解説。専門用語は使わないこと。",
+  "doyaPoint": "ランチの席で「ドヤ顔」で言える、一番言いたい結論の一言（30文字以内）",
+  "starter": "会話を自然に切り出すためのセリフ（例：「ねえ、〇〇って知ってる？」など。30文字以内）",
+  "target": ["家族", "同僚", "友人"] 
 }
 
-制約:
-- 既出タイトルに類似しないこと
-- 必須テーマに必ず沿うこと
-- 日本語で書くこと
-- 事実関係は、一般的に広く知られているものだけに限定すること
-- 断定が難しい固有名詞・年代・由来は避けること
+# 制約事項
+- 必ず日本語で出力すること。
+- 断定が難しい固有名詞・年代・由来は避けること。
+- 出力は指定されたJSONのオブジェクト1つのみとし、ValidなJSONにすること。
 `;
 
   const response = await ai.models.generateContent({
@@ -337,8 +391,107 @@ async function verifyAITrivia(trivia: Trivia) {
 
 let writeQueue = Promise.resolve();
 
+type TriviaAssignmentResponse = {
+  status: number;
+  body: Record<string, unknown>;
+};
+
+async function resolveTriviaAssignment(browserId: string, dateKey: string, refresh: boolean): Promise<TriviaAssignmentResponse> {
+  if (!browserId) {
+    return { status: 400, body: { error: 'browserId is required' } };
+  }
+
+  // If an assignment already exists for this browser/date and caller did not request refresh,
+  // return the existing assignment to avoid duplicate inserts and needless AI calls.
+  try {
+    const existing = await getAssignedFromDb(browserId, dateKey);
+    if (existing && !refresh) {
+      return { status: 200, body: { trivia: existing, source: 'cached' } };
+    }
+  } catch (err) {
+    console.error('Failed checking existing assignment:', err);
+    // continue to attempt assignment; errors here shouldn't block the flow
+  }
+
+  return await new Promise<TriviaAssignmentResponse>((resolve) => {
+    writeQueue = writeQueue.then(async () => {
+      if (refresh) {
+        await deleteAssignmentForBrowserDate(browserId, dateKey);
+      }
+
+      const usedTitles = await getUsedTitlesFromDb(dateKey);
+      const variantIndex = hashString(`${dateKey}-${browserId}`) % 12;
+
+      let assigned: Trivia | null = null;
+
+      // Try multiple times to get a unique AI-generated trivia that also passes fact check.
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        try {
+          const aiTrivia = await generateAITrivia(
+            dateKey,
+            browserId,
+            Array.from(usedTitles),
+            variantIndex,
+            attempt
+          );
+
+          const normalizedTitle = normalizeTitle(aiTrivia?.title || '');
+          if (!normalizedTitle || usedTitles.has(normalizedTitle)) {
+            continue;
+          }
+
+          const candidate = sanitizeTrivia(aiTrivia, dateKey, `${browserId.slice(-6)}-${attempt}`);
+          const factCheck = await verifyAITrivia(candidate);
+          if (!factCheck.approved) {
+            continue;
+          }
+
+          assigned = candidate;
+          break;
+        } catch {
+          // retry with a different prompt variant
+        }
+      }
+
+      if (!assigned) {
+        assigned = buildFallbackTrivia(dateKey, browserId);
+      }
+
+      await insertAssignmentToDb(assigned, browserId);
+
+      // 直近45日だけ保持。
+      const cutoff = new Date(dateKey);
+      cutoff.setDate(cutoff.getDate() - 45);
+      const cutoffKey = toDateKey(cutoff);
+      await pruneOldEntries(cutoffKey);
+
+      resolve({
+        status: 200,
+        body: {
+          trivia: assigned,
+          source: assigned.id.startsWith('fallback-') ? 'fallback' : 'new',
+        },
+      });
+    }).catch((error) => {
+      console.error('[trivia-api] assignment failed:', error);
+      resolve({ status: 500, body: { error: 'internal_error' } });
+    });
+  });
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
+});
+
+app.get('/api/trivia/today', async (req, res) => {
+  const browserId = String(req.query.browserId || '').trim();
+  const dateKey = req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.date))
+    ? String(req.query.date)
+    : toDateKey(new Date());
+  const refresh = req.query.refresh === '1';
+
+  const result = await resolveTriviaAssignment(browserId, dateKey, refresh);
+  res.status(result.status).json(result.body);
 });
 
 app.post('/api/trivia/assign', async (req, res) => {
@@ -348,83 +501,8 @@ app.post('/api/trivia/assign', async (req, res) => {
     : toDateKey(new Date());
   const refresh = req.body?.refresh === true;
 
-  if (!browserId) {
-    res.status(400).json({ error: 'browserId is required' });
-    return;
-  }
-
-  // If an assignment already exists for this browser/date and caller did not request refresh,
-  // return the existing assignment to avoid duplicate inserts and needless AI calls.
-  try {
-    const existing = await getAssignedFromDb(browserId, dateKey);
-    if (existing && !refresh) {
-      res.json({ trivia: existing, source: 'cached' });
-      return;
-    }
-  } catch (err) {
-    console.error('Failed checking existing assignment:', err);
-    // continue to attempt assignment; errors here shouldn't block the flow
-  }
-
-  writeQueue = writeQueue.then(async () => {
-    if (refresh) {
-      await deleteAssignmentForBrowserDate(browserId, dateKey);
-    }
-
-    const usedTitles = await getUsedTitlesFromDb(dateKey);
-    const variantIndex = hashString(`${dateKey}-${browserId}`) % 12;
-
-    let assigned: Trivia | null = null;
-
-    // Try multiple times to get a unique AI-generated trivia that also passes fact check.
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      try {
-        const aiTrivia = await generateAITrivia(
-          dateKey,
-          browserId,
-          Array.from(usedTitles),
-          variantIndex,
-          attempt
-        );
-
-        const normalizedTitle = normalizeTitle(aiTrivia?.title || '');
-        if (!normalizedTitle || usedTitles.has(normalizedTitle)) {
-          continue;
-        }
-
-        const candidate = sanitizeTrivia(aiTrivia, dateKey, `${browserId.slice(-6)}-${attempt}`);
-        const factCheck = await verifyAITrivia(candidate);
-        if (!factCheck.approved) {
-          continue;
-        }
-
-        assigned = candidate;
-        break;
-      } catch {
-        // retry with a different prompt variant
-      }
-    }
-
-    if (!assigned) {
-      res.status(503).json({ error: 'ai_unavailable', message: 'AI trivia generation failed or failed fact check; try again later.' });
-      return;
-    }
-
-    await insertAssignmentToDb(assigned, browserId);
-
-    // 直近45日だけ保持。
-    const cutoff = new Date(dateKey);
-    cutoff.setDate(cutoff.getDate() - 45);
-    const cutoffKey = toDateKey(cutoff);
-    await pruneOldEntries(cutoffKey);
-
-    res.json({ trivia: assigned, source: 'new' });
-  }).catch((error) => {
-    console.error('[trivia-api] assignment failed:', error);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'internal_error' });
-    }
-  });
+  const result = await resolveTriviaAssignment(browserId, dateKey, refresh);
+  res.status(result.status).json(result.body);
 });
 
 app.listen(PORT, () => {
