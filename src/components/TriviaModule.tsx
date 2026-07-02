@@ -1,219 +1,74 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, MessageSquare, History, Check, Smile, Frown, Meh, User, CheckCircle2 } from 'lucide-react';
-import { cn } from '../lib/utils';
-import { Trivia, TriviaLog, UserStats } from '../types';
-
-const DAILY_TRIVIA_CACHE_KEY_PREFIX = 'biz_knowledge_daily_trivia_v2';
-const BROWSER_ID_KEY = 'biz_knowledge_browser_id_v1';
-
-type DailyTriviaCache = {
-  date: string;
-  trivia: Trivia;
-};
-
-function toLocalDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function fallbackTrivia(today: Date, todayKey: string): Trivia {
-  // AI 取得失敗時の generic fallback
-  return {
-    id: `fallback-${todayKey}`,
-    category: 'その他',
-    title: `本日の雑学 (${todayKey})`,
-    explanation: 'AI 雑学の取得に失敗しました。サーバーを確認してください。',
-    doyaPoint: '申し訳ありません。後でもう一度お試しください。',
-    starter: 'ちょっと時間をおいて、もう一度アクセスしてみてください。',
-    target: ['同僚', '友人'],
-    date: todayKey,
-  };
-}
-
-function getBrowserId() {
-  const existing = localStorage.getItem(BROWSER_ID_KEY);
-  if (existing) return existing;
-
-  const randomPart = Math.random().toString(36).slice(2, 10);
-  const uaPart = (navigator.userAgent || 'unknown').replace(/\s+/g, '-').slice(0, 24);
-  const browserId = `${uaPart}-${randomPart}`;
-  localStorage.setItem(BROWSER_ID_KEY, browserId);
-  return browserId;
-}
-
-async function requestAssignedTrivia(browserId: string, todayKey: string) {
-  const response = await fetch('/api/trivia/assign', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ browserId, date: todayKey }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Trivia API failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data?.trivia as Trivia;
-}
+import React, { useState } from 'react';
+import { AnimatePresence } from 'motion/react';
+import { History } from 'lucide-react';
+import { TriviaLog, UserStats } from '../types';
+import { useDailyTrivia } from '../hooks/useDailyTrivia';
+import { TriviaCard } from './trivia/TriviaCard';
+import { TriviaErrorState } from './trivia/TriviaErrorState';
+import { TriviaLogForm } from './trivia/TriviaLogForm';
+import { TriviaStats } from './trivia/TriviaStats';
 
 interface TriviaModuleProps {
   stats: UserStats;
   onUpdateStats: (points: number, category: string, isTrivia?: boolean, triviaLogEntry?: any) => void;
 }
 
+type TriviaReaction = 'funny' | 'failed' | 'known';
+
 export const TriviaModule = ({ stats, onUpdateStats }: TriviaModuleProps) => {
-  // 当日に表示する雑学データ。
-  const [trivia, setTrivia] = useState<Trivia | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [debugRefreshError, setDebugRefreshError] = useState<string | null>(null);
-  // 反応ログ入力フォームの表示状態。
+  const { trivia, isLoading, isRefreshing, error, lastFetchedLabel, refreshTrivia } = useDailyTrivia();
   const [showLogForm, setShowLogForm] = useState(false);
-  const [logNote, setLogNote] = useState("");
-  const [logReaction, setLogReaction] = useState<'funny' | 'failed' | 'known'>('funny');
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [logNote, setLogNote] = useState('');
+  const [logReaction, setLogReaction] = useState<TriviaReaction>('funny');
   const debugMode = import.meta.env.VITE_DEBUG_MODE === 'true';
   const urlDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchTrivia = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const today = new Date();
-        const todayKey = toLocalDateKey(today);
-        const browserId = getBrowserId();
-        const dailyCacheKey = `${DAILY_TRIVIA_CACHE_KEY_PREFIX}_${browserId}`;
-
-        const cachedRaw = localStorage.getItem(dailyCacheKey);
-        if (cachedRaw) {
-          try {
-            const cached = JSON.parse(cachedRaw) as DailyTriviaCache;
-            if (cached?.date === todayKey && cached?.trivia) {
-              if (isMounted) setTrivia(cached.trivia);
-              return;
-            }
-          } catch (cacheErr) {
-            console.warn('Failed to parse daily trivia cache:', cacheErr);
-          }
-        }
-
-        const assignedTrivia = await requestAssignedTrivia(browserId, todayKey);
-        // In AI-only mode, API must return a trivia or an error. Cache and set when available.
-        localStorage.setItem(dailyCacheKey, JSON.stringify({ date: todayKey, trivia: assignedTrivia } satisfies DailyTriviaCache));
-        if (isMounted) setTrivia(assignedTrivia);
-      } catch (err) {
-        console.error('Failed to fetch daily trivia:', err);
-        if (isMounted) {
-          setTrivia(null);
-          setError('AIネタの取得に失敗しました。後でもう一度お試しください。');
-        }
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    };
-
-    fetchTrivia();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const handleDebugRefresh = async () => {
-    setIsRefreshing(true);
-    setDebugRefreshError(null);
-    try {
-      const today = new Date();
-      const todayKey = toLocalDateKey(today);
-      const browserId = getBrowserId();
-
-      const response = await fetch('/api/trivia/assign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ browserId, date: todayKey, refresh: true }),
-      });
-
-      if (!response.ok) {
-        const responseText = await response.text().catch(() => '');
-        throw new Error(`API error: ${response.status}${responseText ? ` / ${responseText}` : ''}`);
-      }
-
-      const data = await response.json();
-      const freshTrivia = data?.trivia as Trivia;
-
-      if (freshTrivia) {
-        setTrivia(freshTrivia);
-        const dailyCacheKey = `${DAILY_TRIVIA_CACHE_KEY_PREFIX}_${browserId}`;
-        localStorage.setItem(
-          dailyCacheKey,
-          JSON.stringify({ date: todayKey, trivia: freshTrivia } satisfies DailyTriviaCache)
-        );
-        setShowLogForm(false);
-      }
-    } catch (err) {
-      console.error('Debug refresh failed:', err);
-      const message = err instanceof Error ? err.message : String(err);
-      setDebugRefreshError(`新しいネタの取得に失敗しました: ${message}`);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
 
   const handleLogSubmit = () => {
     if (!trivia) return;
 
-    // 当日の雑学カードに紐づく 1 件のログを作成。
     const newLog: TriviaLog = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).slice(2, 11),
       triviaId: trivia.id,
       date: new Date().toISOString(),
       reaction: logReaction,
-      note: logNote
+      note: logNote,
     };
 
-  // 反応に応じて付与ポイントを調整（ウケた方が高い）。
     onUpdateStats(logReaction === 'funny' ? 10 : 5, 'trivia', true, newLog);
-    
     setShowLogForm(false);
-    setLogNote("");
+    setLogNote('');
+    setLogReaction('funny');
   };
 
-  if (isLoading) {
+  const handleRefresh = async () => {
+    setShowLogForm(false);
+    await refreshTrivia({ force: true, background: true });
+  };
+
+  if (isLoading && !trivia) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
+      <div className="flex min-h-[28rem] flex-col items-center justify-center gap-4 rounded-[40px] border border-dashed border-yellow-200 bg-white/70 p-8 text-center">
         <div className="w-8 h-8 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin" />
-        <p className="font-serif italic text-gray-500">今日のネタを仕込み中...</p>
+        <p className="font-serif italic text-gray-500">今日のネタを読み込んでいます...</p>
+        <p className="text-xs text-gray-400">初回のみ取得します。以降は今日のキャッシュを優先して表示します。</p>
       </div>
     );
   }
 
-  if (error) {
+  if (error && !trivia) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4 text-center p-8">
-        <Frown size={48} className="text-gray-300" />
-        <p className="text-gray-500 font-serif">{error}</p>
-        <button 
-          onClick={() => window.location.reload()} 
-          className="text-xs font-sans font-bold text-yellow-600 hover:underline"
-        >
-          再読み込みする
-        </button>
-      </div>
+      <TriviaErrorState
+        message={error}
+        onRetry={() => refreshTrivia({ force: true })}
+        onCheckCache={() => refreshTrivia()}
+      />
     );
   }
 
   if (!trivia) return null;
 
-  // 同じ triviaId に対する重複記録を防止する判定。
   const hasTalked = stats.triviaLogs.some(log => log.triviaId === trivia.id);
+  const funnyCount = stats.triviaLogs.filter(log => log.reaction === 'funny').length;
 
   return (
     <>
@@ -221,192 +76,64 @@ export const TriviaModule = ({ stats, onUpdateStats }: TriviaModuleProps) => {
         <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 1000 }}>
           <button
             id="debug-trivia-button"
-            onClick={handleDebugRefresh}
+            onClick={handleRefresh}
             disabled={isRefreshing}
             className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded border border-yellow-200 text-xs"
             aria-label="debug-get-new-trivia"
           >
             {isRefreshing ? '取得中...' : '🔄 新ネタ (DEBUG)'}
           </button>
-        {debugRefreshError && (
-          <div className="mt-2 max-w-xs rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700 shadow-sm">
-            {debugRefreshError}
-          </div>
-        )}
         </div>
       )}
 
       <div className="max-w-3xl mx-auto font-serif">
-      <div className="bg-[#fdfdfb] p-10 rounded-[40px] shadow-sm border border-[#e8e8e0] relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-50 rounded-full -mr-16 -mt-16 opacity-50" />
-        
-        <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-6">
-            <span className="px-4 py-1 bg-[#5A5A40] text-white rounded-full text-[10px] font-sans font-bold uppercase tracking-widest">
-              {trivia.category}
-            </span>
-            <span className="text-[10px] font-sans font-bold text-gray-400 uppercase tracking-widest">
-              {trivia.date}
-            </span>
-          </div>
+        <TriviaCard
+          trivia={trivia}
+          hasTalked={hasTalked}
+          lastFetchedLabel={lastFetchedLabel}
+          statusMessage={error}
+          onOpenLogForm={() => setShowLogForm(true)}
+          onRefresh={handleRefresh}
+          isRefreshing={isRefreshing}
+        />
 
-          <h2 className="text-4xl font-bold text-[#2d2d2d] leading-tight mb-8">
-            {trivia.title}
-          </h2>
-
-          <div className="space-y-6 mb-10">
-            <div className="flex gap-4">
-              <div className="w-1 h-auto bg-yellow-200 rounded-full" />
-              <p className="text-xl text-gray-600 leading-relaxed italic">
-                {trivia.explanation}
-              </p>
-            </div>
-
-            <div className="p-6 bg-yellow-50/50 rounded-2xl border border-yellow-100">
-              <h4 className="text-xs font-sans font-black text-yellow-700 uppercase mb-2 flex items-center gap-2">
-                <Sparkles size={14} /> ドヤ顔ポイント
-              </h4>
-              <p className="text-lg font-bold text-gray-800">
-                {trivia.doyaPoint}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-            <div className="space-y-4">
-              <h4 className="text-xs font-sans font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                <MessageSquare size={14} /> 話し方ガイド
-              </h4>
-              <div className="p-4 bg-white rounded-xl border border-gray-100 shadow-sm italic text-gray-600">
-                「{trivia.starter}」
-              </div>
-            </div>
-            <div className="space-y-4">
-              <h4 className="text-xs font-sans font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                <User size={14} /> おすすめの相手
-              </h4>
-              <div className="flex gap-2">
-                {trivia.target.map(t => (
-                  <span key={t} className="px-3 py-1 bg-gray-100 rounded-full text-[10px] font-sans font-bold text-gray-500">
-                    {t}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-center">
-            {!hasTalked ? (
-              <button
-                onClick={() => setShowLogForm(true)}
-                className="olive-button flex items-center gap-2 hover:scale-105 transition-transform shadow-lg"
-              >
-                <Check size={18} /> 今日、誰かに話した！
-              </button>
-            ) : (
-              <div className="flex items-center gap-2 text-green-600 font-bold italic">
-                <CheckCircle2 size={20} /> アウトプット完了！
-              </div>
-            )}
-          </div>
-
-          
-        </div>
-      </div>
-
-      <AnimatePresence>
-        {showLogForm && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="mt-8 p-8 bg-white rounded-3xl border border-gray-100 shadow-xl"
-          >
-            <h3 className="text-xl font-bold mb-6 text-center">相手の反応はどうでしたか？</h3>
-            <div className="flex justify-center gap-8 mb-8">
-              {[
-                { id: 'funny', icon: Smile, label: 'ウケた', color: 'text-green-500' },
-                { id: 'known', icon: Meh, label: '知ってた', color: 'text-yellow-500' },
-                { id: 'failed', icon: Frown, label: '滑った', color: 'text-red-500' },
-              ].map(r => (
-                <button
-                  key={r.id}
-                  onClick={() => setLogReaction(r.id as any)}
-                  className={cn(
-                    "flex flex-col items-center gap-2 p-4 rounded-2xl transition-all",
-                    logReaction === r.id ? "bg-gray-50 scale-110 ring-2 ring-gray-200" : "opacity-40 hover:opacity-100"
-                  )}
-                >
-                  <r.icon size={32} className={r.color} />
-                  <span className="text-xs font-sans font-bold">{r.label}</span>
-                </button>
-              ))}
-            </div>
-            <textarea
-              id="trivia-log-note"
-              name="triviaLogNote"
-              value={logNote}
-              onChange={(e) => setLogNote(e.target.value)}
-              placeholder="メモ（相手の反応など）"
-              className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-yellow-200 mb-6 font-sans text-sm"
-              rows={3}
+        <AnimatePresence>
+          {showLogForm && (
+            <TriviaLogForm
+              reaction={logReaction}
+              note={logNote}
+              onReactionChange={setLogReaction}
+              onNoteChange={setLogNote}
+              onSubmit={handleLogSubmit}
+              onCancel={() => setShowLogForm(false)}
             />
-            <div className="flex justify-end gap-4">
-              <button onClick={() => setShowLogForm(false)} className="px-6 py-2 text-gray-400 font-sans font-bold text-sm">キャンセル</button>
-              <button onClick={handleLogSubmit} className="olive-button font-sans font-bold text-sm">記録を保存</button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
-      <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm text-center">
-          <h4 className="text-[10px] font-sans font-black text-gray-400 uppercase tracking-widest mb-2">博識レベル</h4>
-          <div className="text-3xl font-bold text-[#5A5A40]">{stats.knowledgeLevel}</div>
-          <p className="text-[10px] text-gray-400 mt-1 italic">Knowledge Level</p>
-        </div>
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm text-center">
-          <h4 className="text-[10px] font-sans font-black text-gray-400 uppercase tracking-widest mb-2">アウトプット数</h4>
-          <div className="text-3xl font-bold text-[#5A5A40]">{stats.triviaLogs.length}</div>
-          <p className="text-[10px] text-gray-400 mt-1 italic">Total Outputs</p>
-        </div>
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm text-center">
-          <h4 className="text-[10px] font-sans font-black text-gray-400 uppercase tracking-widest mb-2">ウケた回数</h4>
-          <div className="text-3xl font-bold text-[#5A5A40]">
-            {stats.triviaLogs.filter(l => l.reaction === 'funny').length}
-          </div>
-          <p className="text-[10px] text-gray-400 mt-1 italic">Success Count</p>
-        </div>
-      </div>
+        <TriviaStats
+          knowledgeLevel={stats.knowledgeLevel}
+          outputCount={stats.triviaLogs.length}
+          funnyCount={funnyCount}
+        />
 
-      {stats.triviaLogs.length > 0 && (
-        <div className="mt-12">
-          <h4 className="text-xs font-sans font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-            <History size={14} /> 最近の持ちネタ
-          </h4>
-          <div className="space-y-4">
-            {stats.triviaLogs.slice(0, 5).map(log => (
-              <div key={log.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className={cn(
-                    "w-10 h-10 rounded-full flex items-center justify-center",
-                    log.reaction === 'funny' ? "bg-green-50 text-green-500" : 
-                    log.reaction === 'known' ? "bg-yellow-50 text-yellow-500" : "bg-red-50 text-red-500"
-                  )}>
-                    {log.reaction === 'funny' ? <Smile size={20} /> : 
-                     log.reaction === 'known' ? <Meh size={20} /> : <Frown size={20} />}
-                  </div>
+        {stats.triviaLogs.length > 0 && (
+          <div className="mt-12">
+            <h4 className="text-xs font-sans font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+              <History size={14} /> 最近の持ちネタ
+            </h4>
+            <div className="space-y-4">
+              {stats.triviaLogs.slice(0, 5).map(log => (
+                <div key={log.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
                   <div>
                     <div className="text-xs font-bold text-gray-400">{new Date(log.date).toLocaleDateString()}</div>
-                    <div className="text-sm font-bold text-gray-700">{log.note || "メモなし"}</div>
+                    <div className="text-sm font-bold text-gray-700">{log.note || 'メモなし'}</div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
     </>
   );
 };
