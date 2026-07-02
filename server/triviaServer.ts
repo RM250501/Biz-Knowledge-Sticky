@@ -262,7 +262,7 @@ async function generateAITrivia(dateKey: string, browserId: string, avoidTitles:
 `;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-2.0-flash',
     contents: prompt,
     config: {
       responseMimeType: 'application/json',
@@ -313,7 +313,7 @@ async function verifyAITrivia(trivia: Trivia) {
 `;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-2.0-flash',
     contents: prompt,
     config: {
       responseMimeType: 'application/json',

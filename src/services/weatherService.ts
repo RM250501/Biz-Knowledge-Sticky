@@ -219,59 +219,71 @@ function toJmaAlertLevel(status: string): WeatherAlert['level'] {
 }
 
 async function fetchJmaAlerts(): Promise<WeatherAlert[]> {
-  const [warningResponse, areaResponse] = await Promise.all([
-    fetch('https://www.jma.go.jp/bosai/warning/data/warning/map.json'),
-    fetch('https://www.jma.go.jp/bosai/common/const/area.json'),
-  ]);
+  try {
+    // Promise.allSettled() で部分的な失敗にも対応（JMA API が不安定なため）
+    const [warningResponse, areaResponse] = await Promise.allSettled([
+      fetch('https://www.jma.go.jp/bosai/warning/data/warning/map.json'),
+      fetch('https://www.jma.go.jp/bosai/common/const/area.json'),
+    ]);
 
-  if (!warningResponse.ok || !areaResponse.ok) {
-    throw new Error('Failed to fetch JMA warning data');
-  }
+    // 両方が成功したケースのみ処理する
+    if (warningResponse.status !== 'fulfilled' || areaResponse.status !== 'fulfilled') {
+      console.warn('Partial JMA API failure; returning empty alerts');
+      return [];
+    }
 
-  const warningData = (await warningResponse.json()) as JmaWarningSnapshot[];
-  const areaMaster = (await areaResponse.json()) as JmaAreaMaster;
-  const latestSnapshot = warningData[0];
+    if (!warningResponse.value.ok || !areaResponse.value.ok) {
+      throw new Error('Failed to fetch JMA warning data');
+    }
 
-  if (!latestSnapshot || !Array.isArray(latestSnapshot.areaTypes)) {
-    return [];
-  }
+    const warningData = (await warningResponse.value.json()) as JmaWarningSnapshot[];
+    const areaMaster = (await areaResponse.value.json()) as JmaAreaMaster;
+    const latestSnapshot = warningData[0];
 
-  const grouped = new Map<string, { status: string; areas: string[] }>();
+    if (!latestSnapshot || !Array.isArray(latestSnapshot.areaTypes)) {
+      return [];
+    }
 
-  for (const areaType of latestSnapshot.areaTypes) {
-    for (const area of areaType.areas || []) {
-      const areaName = toJmaAreaName(area.code, areaMaster);
-      for (const warning of area.warnings || []) {
-        const status = warning.status || '';
-        if (status.includes('解除')) continue;
+    const grouped = new Map<string, { status: string; areas: string[] }>();
 
-        const key = `${warning.code}:${status}`;
-        const current = grouped.get(key);
-        if (current) {
-          if (current.areas.length < 3) {
-            current.areas.push(areaName);
+    for (const areaType of latestSnapshot.areaTypes) {
+      for (const area of areaType.areas || []) {
+        const areaName = toJmaAreaName(area.code, areaMaster);
+        for (const warning of area.warnings || []) {
+          const status = warning.status || '';
+          if (status.includes('解除')) continue;
+
+          const key = `${warning.code}:${status}`;
+          const current = grouped.get(key);
+          if (current) {
+            if (current.areas.length < 3) {
+              current.areas.push(areaName);
+            }
+            continue;
           }
-          continue;
-        }
 
-        grouped.set(key, { status, areas: [areaName] });
+          grouped.set(key, { status, areas: [areaName] });
+        }
       }
     }
+
+    const alerts = Array.from(grouped.entries())
+      .map(([key, value]) => {
+        const [code] = key.split(':');
+        const areaSummary = value.areas.join(' / ');
+        return {
+          level: toJmaAlertLevel(value.status),
+          title: `気象庁 警報・注意報コード ${code} (${value.status})`,
+          detail: `${areaSummary} ほかで発表されています。`,
+        } as WeatherAlert;
+      })
+      .slice(0, 6);
+
+    return alerts;
+  } catch (error) {
+    console.error('Error fetching JMA alerts:', error);
+    return [];
   }
-
-  const alerts = Array.from(grouped.entries())
-    .map(([key, value]) => {
-      const [code] = key.split(':');
-      const areaSummary = value.areas.join(' / ');
-      return {
-        level: toJmaAlertLevel(value.status),
-        title: `気象庁 警報・注意報コード ${code} (${value.status})`,
-        detail: `${areaSummary} ほかで発表されています。`,
-      } as WeatherAlert;
-    })
-    .slice(0, 6);
-
-  return alerts;
 }
 
 function buildForecast(hourly: WeatherResponse['hourly']): ForecastItem[] {

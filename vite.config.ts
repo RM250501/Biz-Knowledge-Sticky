@@ -6,12 +6,20 @@ import {defineConfig, loadEnv} from 'vite';
 export default defineConfig(({mode}) => {
   // 現在のモード（dev/build）に対応する環境変数を読み込む。
   const env = loadEnv(mode, '.', '');
+  
+  // 本番ビルド時に破損データのある API キーを事前検出。
+  if (mode === 'build' && !env.GEMINI_API_KEY) {
+    console.warn('WARNING: GEMINI_API_KEY is not set. Some features (news, local info) will not work.');
+  }
+  
   return {
     // React 変換と Tailwind 処理を有効化。
     plugins: [react(), tailwindcss()],
     define: {
       // ビルド時置換で Gemini API キーをクライアントコードから参照可能にする。
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
+      // Vite 環境変数のサポート（import.meta.env での参照用）
+      'import.meta.env.VITE_DEBUG_MODE': JSON.stringify(env.VITE_DEBUG_MODE || 'false'),
     },
     resolve: {
       alias: {

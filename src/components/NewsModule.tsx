@@ -7,6 +7,8 @@ export const NewsModule = () => {
   // UI に表示するカテゴリ別ニュースカード。
   const [displayNews, setDisplayNews] = useState<any[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // ニュース取得エラーメッセージ（再試行の促し）
+  const [fetchError, setFetchError] = useState<string | null>(null);
   // 画面表示用の最終更新時刻。
   const [lastUpdated, setLastUpdated] = useState<string>("");
 
@@ -21,13 +23,18 @@ export const NewsModule = () => {
         // 同日内の再取得を避けるためローカルキャッシュを再利用。
         setDisplayNews(JSON.parse(savedNews));
         setLastUpdated(localStorage.getItem('biz_daily_news_time') || "");
+        setFetchError(null);
         return;
       } catch (e) {
         console.error("Failed to parse saved news:", e);
+        // 破損キャッシュは削除
+        localStorage.removeItem('biz_daily_news');
+        localStorage.removeItem('biz_daily_news_date');
       }
     }
 
     setIsRefreshing(true);
+    setFetchError(null);
     try {
       // Gemini サービスから最新カテゴリニュースを取得。
       const categories = await getActualNewsTopics();
@@ -45,7 +52,9 @@ export const NewsModule = () => {
       }
     } catch (error) {
       console.error("Failed to fetch news topics:", error);
-      // 取得失敗時は下部の空状態メッセージで再取得を促す。
+      setFetchError(
+        '最新ニュースの取得に失敗しました。ネットワークを確認するか、キャッシュをクリアして再度お試しください。'
+      );
     } finally {
       setIsRefreshing(false);
     }

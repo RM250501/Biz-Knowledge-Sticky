@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 // クライアント再生成を避けるため、呼び出し間で使い回すシングルトン。
-let genAI: any = null;
+let genAI: GoogleGenAI | null = null;
 
 function getGenAI() {
   if (!genAI) {
@@ -36,7 +36,7 @@ export async function getAIExplanation(question: string, userAnswer: string, isC
 
     // 短文フィードバック生成には高速モデルを利用。
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: prompt,
     });
 
@@ -56,7 +56,7 @@ export async function getActualLocalInfo(lat: number, lon: number) {
 
     const response = await ai.models.generateContent({
       // 構造化出力と検索を伴うため、より高性能なモデルを利用。
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-2.0-flash",
       contents: prompt,
       config: {
         // Google Search による根拠付き生成を許可。
@@ -117,7 +117,7 @@ export async function getActualNewsTopics() {
     信頼できるソース（日本経済新聞、ITmedia、ロイター、読売新聞、東洋経済オンラインなど）の記事を優先してください。`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-2.0-flash",
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
@@ -229,7 +229,7 @@ export async function getDailyTrivia(dayOfWeek: number, options: DailyTriviaOpti
 
     const response = await ai.models.generateContent({
       // 短い創作生成のため高速モデルを利用。
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -305,7 +305,7 @@ export async function generateQuizReport(sessionLog: Array<any>) {
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-2.0-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
