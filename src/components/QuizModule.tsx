@@ -55,6 +55,8 @@ export const QuizModule = ({ onComplete, launchPreset, onPresetConsumed }: QuizM
   // AIで生成されたセッションレポート
   const [sessionReport, setSessionReport] = useState<any>(null);
   const [reportLoading, setReportLoading] = useState(false);
+  // レポート生成エラーメッセージ
+  const [reportError, setReportError] = useState<string | null>(null);
   // 結果画面で表示するメッセージ。
   const [summaryMessage, setSummaryMessage] = useState<string>('');
 
@@ -141,16 +143,29 @@ export const QuizModule = ({ onComplete, launchPreset, onPresetConsumed }: QuizM
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [launchPreset]);
 
-  // セッション終了時に AI レポートを生成する
+  // セッション終了時に AI レポートを生成し、統計情報を保存する
   useEffect(() => {
     if (sessionState === 'summary' && sessionReport == null && sessionLog.length > 0) {
       (async () => {
         try {
+          setReportError(null);
           setReportLoading(true);
           const report = await generateQuizReport(sessionLog);
           setSessionReport(report);
+          
+          // レポート取得成功時は、統計を localStorage に並列保存する。
+          const today = new Date().toISOString().split('T')[0];
+          const key = `quiz_session_${today}`;
+          localStorage.setItem(key, JSON.stringify({
+            timestamp: Date.now(),
+            log: sessionLog,
+            report: report,
+          }));
         } catch (e) {
           console.error('Report generation failed', e);
+          setReportError(
+            e instanceof Error ? e.message : 'レポート生成に失敗しました。もう一度実行してください。'
+          );
           setSessionReport(null);
         } finally {
           setReportLoading(false);

@@ -2,7 +2,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&display=swap');
 @import "tailwindcss";
 
-@theme {
+:root {
   /* font-sans / font-mono / font-serif で参照されるテーマトークン。 */
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
@@ -12,7 +12,20 @@
 @layer components {
   /* Trivia モジュールのアクションで使う共通 CTA スタイル。 */
   .olive-button {
-    @apply bg-[#5A5A40] text-white rounded-full px-6 py-3 tracking-wider transition-all hover:bg-[#4a4a35] active:scale-95;
+    background-color: #5A5A40;
+    color: white;
+    border-radius: 9999px;
+    padding: 0.75rem 1.5rem;
+    letter-spacing: 0.1em;
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
+  .olive-button:hover {
+    background-color: #4a4a35;
+  }
+  .olive-button:active {
+    transform: scale(0.95);
   }
 }
 

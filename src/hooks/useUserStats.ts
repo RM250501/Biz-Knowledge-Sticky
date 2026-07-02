@@ -10,6 +10,8 @@ export function useUserStats() {
         return JSON.parse(saved);
       } catch (e) {
         console.error('Failed to parse stats from localStorage', e);
+        // 破損データは削除して、初期化時に復旧できるようにする
+        localStorage.removeItem('biz_knowledge_stats');
       }
     }
     return INITIAL_STATS;

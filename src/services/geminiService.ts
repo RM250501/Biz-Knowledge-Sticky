@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 // クライアント再生成を避けるため、呼び出し間で使い回すシングルトン。
-let genAI: any = null;
+let genAI: GoogleGenAI | null = null;
 
 function getGenAI() {
   if (!genAI) {
