@@ -296,7 +296,7 @@
 ## scripts
 
 - `validateQuestions.ts`: 問題データの ID 重複、選択肢数、正解番号、空欄などを検査する。
-- `checkStreak.ts`: 連続ログイン日数（`nextLoginStreak`）と日数差（`diffInDays`）の計算を、代表的なケースで確認する。`npm run check:streak` で実行。
+- `checkStreak.ts`: 連続ログイン日数（`nextLoginStreak`）、日数差（`diffInDays`）、日付キー（`toLocalDateKey`）の計算を確認する。実行環境に左右されないよう、日数差は米国東部時間（夏時間の切り替えあり）、日付キーは日本時間に固定して検証する。`npm run check:streak` で実行。
 
 ## 補足
 - 各 UI コンポーネントは `motion/react` を使って遷移・ホバー演出を付与。
