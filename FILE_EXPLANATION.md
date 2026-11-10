@@ -72,6 +72,9 @@
 - `server.hmr`:
   `DISABLE_HMR` でホットリロードを切替。
 
+### .github/workflows/ci.yml
+- GitHub Actions の CI。PR と main への push で、型チェック・問題データチェック・日付計算チェック・ビルドを実行する。
+
 ### README.md
 - アプリ概要、機能、セットアップ、データ保存仕様のユーザー向け説明。
 

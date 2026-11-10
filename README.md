@@ -74,6 +74,15 @@ Biz-Knowledge Sticky は、ビジネス一般常識を日々の習慣として�
 - `npm run check:streak`: 連続ログイン日数の計算チェック
 - `npm run clean`: `dist` を削除
 
+## CI
+
+GitHub Actions（`.github/workflows/ci.yml`）で、PR ごとと main への push ごとに次を実行します。
+
+- `npm run lint`（型チェック）
+- `npm run check:questions`（クイズ問題データのチェック）
+- `npm run check:streak`（連続ログイン日数・日付計算のチェック）
+- `npm run build`（本番ビルド）
+
 ## 環境変数
 
 - `GEMINI_API_KEY`: Gemini API を利用する機能で必要。API サーバーだけが読み、ブラウザ向けのビルドには含めない
