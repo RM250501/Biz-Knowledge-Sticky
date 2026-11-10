@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Newspaper, Globe, ExternalLink, RefreshCw } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { fetchNewsTopics, type NewsCategory } from '../services/apiClient';
+import { toLocalDateKey } from '../../shared/date';
 
 export const NewsModule = () => {
   // UI に表示するカテゴリ別ニュースカード。
@@ -14,7 +15,7 @@ export const NewsModule = () => {
 
   const fetchNews = useCallback(async (force = false) => {
     // キャッシュは日付単位で管理する。
-    const today = new Date().toISOString().split('T')[0];
+    const today = toLocalDateKey();
     const savedNews = localStorage.getItem('biz_daily_news');
     const savedDate = localStorage.getItem('biz_daily_news_date');
 

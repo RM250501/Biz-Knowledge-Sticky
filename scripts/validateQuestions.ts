@@ -27,17 +27,14 @@ for (const q of QUESTIONS) {
 }
 
 const counts: Record<string, number> = {};
-const answerPositions = [0, 0, 0, 0];
 for (const q of QUESTIONS) {
   counts[q.category] = (counts[q.category] || 0) + 1;
-  answerPositions[q.correctIndex] += 1;
 }
 
 console.log(`問題数: ${QUESTIONS.length}`);
 for (const [category, count] of Object.entries(counts)) {
   console.log(`  ${CATEGORY_LABELS[category] || category}: ${count}`);
 }
-console.log(`正解位置の分布 (1〜4番目): ${answerPositions.join(' / ')}`);
 
 if (errors.length > 0) {
   console.error(`\n${errors.length} 件のエラー:`);

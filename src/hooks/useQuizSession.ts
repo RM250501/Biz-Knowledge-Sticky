@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Question } from '../types';
 import { QUESTIONS } from '../data/questions';
 import { shuffle } from '../lib/shuffle';
+import { toLocalDateKey } from '../../shared/date';
 import { requestQuizReport } from '../services/apiClient';
 import { buildLocalQuizReport, type QuizReport, type QuizSessionLogItem } from '../../shared/quizReport';
 import {
@@ -43,8 +44,7 @@ function buildSessionPool(settings: QuizSettings): Question[] {
 
 function saveSessionLog(log: QuizSessionLogItem[], report: QuizReport) {
   try {
-    const today = new Date().toISOString().split('T')[0];
-    localStorage.setItem(`quiz_session_${today}`, JSON.stringify({ timestamp: Date.now(), log, report }));
+    localStorage.setItem(`quiz_session_${toLocalDateKey()}`, JSON.stringify({ timestamp: Date.now(), log, report }));
   } catch (error) {
     console.warn('Failed to save quiz session:', error);
   }

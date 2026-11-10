@@ -7,6 +7,14 @@ export default defineConfig(({mode}) => {
   // 現在のモード（dev/build）に対応する環境変数を読み込む。
   const env = loadEnv(mode, '.', '');
   
+  // 開発サーバーと preview の両方で /api を API サーバーへ転送する。
+  const apiProxy = {
+    '/api': {
+      target: `http://localhost:${env.TRIVIA_API_PORT || 8787}`,
+      changeOrigin: true,
+    },
+  };
+
   return {
     // React 変換と Tailwind 処理を有効化。
     plugins: [react(), tailwindcss()],
@@ -25,12 +33,10 @@ export default defineConfig(({mode}) => {
       // エージェント編集時のちらつき防止のため、通常は変更しない。
       // AI Studio 互換性を保ちつつ、ローカルでは切替可能にする。
       hmr: process.env.DISABLE_HMR !== 'true',
-      proxy: {
-        '/api': {
-          target: `http://localhost:${env.TRIVIA_API_PORT || 8787}`,
-          changeOrigin: true,
-        },
-      },
+      proxy: apiProxy,
+    },
+    preview: {
+      proxy: apiProxy,
     },
   };
 });

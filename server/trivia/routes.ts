@@ -9,6 +9,7 @@ import {
   verifyAITrivia,
 } from './generator';
 import type { Trivia } from './types';
+import { toLocalDateKey } from '../../shared/date';
 
 const RETENTION_DAYS = 45;
 const MAX_ATTEMPTS = 5;
@@ -22,16 +23,9 @@ function normalizeTitle(input: string) {
   return (input || '').trim().replace(/\s+/g, '');
 }
 
-function toDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 function parseDateKey(value: unknown) {
   const text = String(value || '');
-  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : toDateKey(new Date());
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : toLocalDateKey();
 }
 
 // DB 書き込みと AI 生成を直列化し、同じ日に同じタイトルが配られるのを防ぐ。
@@ -40,6 +34,10 @@ let writeQueue: Promise<unknown> = Promise.resolve();
 async function assignNewTrivia(browserId: string, dateKey: string, refresh: boolean): Promise<Trivia> {
   if (refresh) {
     await deleteAssignment(browserId, dateKey);
+  } else {
+    // 同じブラウザの同時リクエストが先に割り当て済みなら、それを返す。
+    const existing = await getAssignment(browserId, dateKey);
+    if (existing) return existing;
   }
 
   const usedTitles = await getUsedTitles(dateKey);
@@ -66,7 +64,7 @@ async function assignNewTrivia(browserId: string, dateKey: string, refresh: bool
 
   const cutoff = new Date(dateKey);
   cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
-  await pruneBefore(toDateKey(cutoff));
+  await pruneBefore(toLocalDateKey(cutoff));
 
   return trivia;
 }

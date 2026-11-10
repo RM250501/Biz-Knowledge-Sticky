@@ -6,24 +6,39 @@ import {
   type QuizReport,
   type QuizSessionLogItem,
 } from '../../shared/quizReport';
+import { QUESTIONS } from '../../src/data/questions';
 
 const MAX_LOG_ITEMS = 200;
+const QUESTIONS_BY_ID = new Map(QUESTIONS.map((q) => [q.id, q]));
 
+// 回答ログはクライアントの値を信用せず、questionId から問題・正解を引き直す。
+// 回答は選択肢の文字列に一致するものだけを受け付け、正誤もサーバーで判定する。
+// これにより、任意の文字列がプロンプトに入らないようにする。
 function parseSessionLog(body: unknown): QuizSessionLogItem[] | null {
   const raw = (body as any)?.sessionLog;
   if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_LOG_ITEMS) return null;
-  return raw.map((s: any) => ({
-    questionId: String(s?.questionId ?? ''),
-    question: String(s?.question ?? ''),
-    category: String(s?.category ?? ''),
-    correctAnswer: String(s?.correctAnswer ?? ''),
-    userAnswer: String(s?.userAnswer ?? ''),
-    isCorrect: s?.isCorrect === true,
-    timestamp: String(s?.timestamp ?? ''),
-  }));
+
+  const items: QuizSessionLogItem[] = [];
+  for (const s of raw) {
+    const question = QUESTIONS_BY_ID.get(String(s?.questionId ?? ''));
+    if (!question) continue;
+    const correctAnswer = question.options[question.correctIndex];
+    const submitted = String(s?.userAnswer ?? '');
+    const userAnswer = question.options.includes(submitted) ? submitted : '';
+    items.push({
+      questionId: question.id,
+      question: question.question,
+      category: question.category,
+      correctAnswer,
+      userAnswer,
+      isCorrect: userAnswer === correctAnswer,
+      timestamp: String(s?.timestamp ?? '').slice(0, 40),
+    });
+  }
+  return items.length > 0 ? items : null;
 }
 
-// 総括とコメントだけを AI に書かせ、正誤表は回答ログからそのまま作る。
+// 総括とコメントだけを AI に書かせ、正誤表は検証済みの回答ログから作る。
 async function generateAIReport(sessionLog: QuizSessionLogItem[]): Promise<QuizReport> {
   const ai = getGenAI();
   const summaryItems = sessionLog

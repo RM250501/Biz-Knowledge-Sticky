@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Trivia } from '../types';
+import { toLocalDateKey } from '../../shared/date';
 
 const DAILY_TRIVIA_CACHE_KEY_PREFIX = 'biz_knowledge_daily_trivia_v2';
 const BROWSER_ID_KEY = 'biz_knowledge_browser_id_v1';
@@ -22,13 +23,6 @@ type DailyTriviaState = {
   lastFetchedLabel: string;
   refreshTrivia: (options?: LoadTriviaOptions) => Promise<void>;
 };
-
-function toLocalDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 function getBrowserId() {
   const existing = localStorage.getItem(BROWSER_ID_KEY);
