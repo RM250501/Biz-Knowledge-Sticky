@@ -273,7 +273,7 @@
 ### server/trivia/
 - `routes.ts`: 日替わり雑学の割り当て（同日同ブラウザは同じネタ、別ブラウザには別のネタ）。
 - `generator.ts`: 雑学の AI 生成、別の AI 呼び出しによる事実確認、フォールバックデータ。
-- `db.ts`: sql.js（SQLite）での割り当て保存。`.data/trivia.db` に書き出す。
+- `db.ts`: sql.js（SQLite）での割り当て保存。`.data/trivia.db` に書き出す（初回起動時に自動作成。Git の管理対象外）。
 
 ### server/routes/
 - `news.ts`: Google 検索連携で最新ニュースを取得。同じ日はメモリにキャッシュする。

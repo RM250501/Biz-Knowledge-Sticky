@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { UserStats, INITIAL_STATS } from '../types';
+import { diffInDays, toLocalDateKey } from '../../shared/date';
 
 export function useUserStats() {
   // リロード後も進捗を維持できるよう、localStorage から初期化する。
@@ -23,29 +24,29 @@ export function useUserStats() {
   }, [stats]);
 
   useEffect(() => {
-    // 連続ログイン日数を判定する。
-    const today = new Date().toISOString().split('T')[0];
+    // 連続ログイン日数を判定する。日付はローカル時刻（日本なら 0 時切り替え）で扱う。
+    const today = toLocalDateKey();
     if (stats.lastLoginDate !== today) {
       setStats(prev => {
         let newStreak = prev.loginStreak || 0;
         const lastLogin = prev.lastLoginDate;
-        
+
         if (lastLogin) {
           // 最終ログイン日と今日の日付差から連続日数を判定する。
-          const lastDate = new Date(lastLogin);
-          const currentDate = new Date(today);
-          const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          
+          // 以前のバージョンは UTC の日付で保存していたため、差が 0 以下（同じ日扱い）もありうる。
+          const diffDays = diffInDays(lastLogin, today);
           if (diffDays === 1) {
             newStreak += 1;
           } else if (diffDays > 1) {
+            newStreak = 1;
+          } else if (newStreak === 0) {
             newStreak = 1;
           }
         } else {
           newStreak = 1;
         }
-        
+
+
         return {
           ...prev,
           lastLoginDate: today,
@@ -84,7 +85,7 @@ export function useUserStats() {
           : (prev.triviaLogs || []);
 
         // ダッシュボード用に日次の集計ログを更新。
-        const today = new Date().toISOString().split('T')[0];
+        const today = toLocalDateKey();
         const newLearningLog = Array.isArray(prev.learningLog) ? [...prev.learningLog] : [];
         const todayLogIdx = newLearningLog.findIndex(log => log.date === today);
         
@@ -125,5 +126,14 @@ export function useUserStats() {
     }
   };
 
-  return { stats, setStats, updateScore };
+  // 回答した問題 ID を記録する（正誤は問わず、重複なし）。
+  const markQuestionAnswered = useCallback((questionId: string) => {
+    setStats(prev => {
+      const answered = prev.completedQuestions || [];
+      if (answered.includes(questionId)) return prev;
+      return { ...prev, completedQuestions: [...answered, questionId] };
+    });
+  }, []);
+
+  return { stats, setStats, updateScore, markQuestionAnswered };
 }

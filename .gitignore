@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# 雑学 API サーバーの実行時データ（利用者のブラウザ ID を含む）
+.data/

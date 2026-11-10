@@ -50,7 +50,10 @@ function saveSessionLog(log: QuizSessionLogItem[], report: QuizReport) {
   }
 }
 
-export function useQuizSession(onCorrect: (points: number, category: string) => void) {
+export function useQuizSession(
+  onCorrect: (points: number, category: string) => void,
+  onAnswered?: (questionId: string) => void,
+) {
   const [state, setState] = useState<QuizSessionState>('setup');
   const [settings, setSettings] = useState<QuizSettings>(DEFAULT_QUIZ_SETTINGS);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -127,6 +130,7 @@ export function useQuizSession(onCorrect: (points: number, category: string) => 
     setSelectedOption(optionIdx);
 
     const isCorrect = optionIdx === currentQuestion.correctIndex;
+    onAnswered?.(currentQuestion.id);
     if (isCorrect) {
       // 正解時のみカテゴリに XP を加算する。
       onCorrect(10, currentQuestion.category);
@@ -143,7 +147,7 @@ export function useQuizSession(onCorrect: (points: number, category: string) => 
         timestamp: new Date().toISOString(),
       },
     ]);
-  }, [state, currentQuestion, selectedOption, onCorrect]);
+  }, [state, currentQuestion, selectedOption, onCorrect, onAnswered]);
 
   const next = useCallback(() => {
     if (!isLastQuestion) {
