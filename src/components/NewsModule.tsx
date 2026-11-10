@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Newspaper, Globe, ExternalLink, RefreshCw } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { getActualNewsTopics } from '../services/geminiService';
+import { fetchNewsTopics, type NewsCategory } from '../services/apiClient';
 
 export const NewsModule = () => {
   // UI に表示するカテゴリ別ニュースカード。
-  const [displayNews, setDisplayNews] = useState<any[]>([]);
+  const [displayNews, setDisplayNews] = useState<NewsCategory[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   // ニュース取得エラーメッセージ（再試行の促し）
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -36,9 +36,9 @@ export const NewsModule = () => {
     setIsRefreshing(true);
     setFetchError(null);
     try {
-      // Gemini サービスから最新カテゴリニュースを取得。
-      const categories = await getActualNewsTopics();
-      if (categories && Array.isArray(categories) && categories.length > 0) {
+      // サーバー経由で最新カテゴリニュースを取得。
+      const categories = await fetchNewsTopics(force);
+      if (categories.length > 0) {
         const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         setDisplayNews(categories);
         setLastUpdated(timeStr);
@@ -53,7 +53,7 @@ export const NewsModule = () => {
     } catch (error) {
       console.error("Failed to fetch news topics:", error);
       setFetchError(
-        '最新ニュースの取得に失敗しました。ネットワークを確認するか、キャッシュをクリアして再度お試しください。'
+        '最新ニュースの取得に失敗しました。API サーバー（npm run dev:api）と GEMINI_API_KEY の設定を確認してください。'
       );
     } finally {
       setIsRefreshing(false);
