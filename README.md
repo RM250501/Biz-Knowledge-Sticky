@@ -72,6 +72,7 @@ Biz-Knowledge Sticky は、ビジネス一般常識を日々の習慣として�
 - `npm run lint`: TypeScript 型チェック
 - `npm run check:questions`: クイズ問題データの形式チェック
 - `npm run check:streak`: 連続ログイン日数の計算チェック
+- `npm run check:gemini`: Gemini API に実際に接続し、モデル・構造化出力・Google 検索連携が使えるか確認（API キーが必要）
 - `npm run clean`: `dist` を削除
 
 ## CI
@@ -87,6 +88,8 @@ GitHub Actions（`.github/workflows/ci.yml`）で、PR ごとと main への pus
 
 - `GEMINI_API_KEY`: Gemini API を利用する機能で必要。API サーバーだけが読み、ブラウザ向けのビルドには含めない
 - 未設定でも、クイズ（レポートはローカル集計）や天気など一部の機能は使える
+- `GEMINI_MODEL`: 使う Gemini のモデル（既定値 `gemini-3.6-flash`）。モデルは提供終了で入れ替わるため、変更したら `npm run check:gemini` で確認する
+- `TRUST_PROXY`: Cloud Run や nginx などのリバースプロキシの後ろで動かすときに設定する（Cloud Run なら `1`、同じマシンの nginx なら `loopback`）。未設定だと、利用者全員が同じ IP として数えられ、回数制限がまとめてかかる
 - `.env.local` は Git に含めない。キーを `.env.example` などのコミット対象ファイルに書かない
 
 ## ディレクトリ構成

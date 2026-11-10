@@ -230,6 +230,8 @@
   `biz_knowledge_stats` を localStorage から復元。失敗時は `INITIAL_STATS`。
 - 永続化:
   `stats` 更新時に localStorage へ保存。
+- 複数タブ:
+  別のタブの更新を `storage` イベントで取り込み、更新時も別タブの最新データを土台にする（XP や記録の上書きを防ぐ）。
 - 連続ログイン判定:
   ローカルの日付で `lastLoginDate` と今日を比べ、`loginStreak` を更新（計算は `src/lib/streak.ts`）。
   開いたまま日付をまたいでも、1 分ごとの確認とタブ復帰時の確認で更新される。
@@ -279,8 +281,11 @@
 - Express の API サーバー。`/api/trivia`、`/api/news`、`/api/quiz/report` をまとめる。
 - `dist/` があればビルド済みフロントエンドも配信する。
 
+### server/index.ts の `TRUST_PROXY`
+- リバースプロキシの後ろで動かすとき、利用者の IP を正しく取るための設定（回数制限に使う）。
+
 ### server/gemini.ts
-- Gemini クライアントの生成と、使用モデル名 `GEMINI_MODEL`。`GEMINI_API_KEY` はここでだけ読む。
+- Gemini クライアントの生成と、使用モデルの決定（環境変数 `GEMINI_MODEL`、既定値 `gemini-3.6-flash`）。`GEMINI_API_KEY` はここでだけ読む。
 
 ### server/trivia/
 - `routes.ts`: 日替わり雑学の割り当て（同日同ブラウザは同じネタ、別ブラウザには別のネタ）。
@@ -299,6 +304,7 @@
 ## scripts
 
 - `validateQuestions.ts`: 問題データの ID 重複、選択肢数、正解番号、空欄などを検査する。
+- `checkGemini.ts`: Gemini API に実際に接続し、モデルの存在・構造化出力・Google 検索連携を確認する。API キーが必要なので CI では実行しない。`npm run check:gemini` で実行。
 - `checkStreak.ts`: 連続ログイン日数（`nextLoginStreak`）、日数差（`diffInDays`）、日付キー（`toLocalDateKey`）の計算を確認する。実行環境に左右されないよう、日数差は米国東部時間（夏時間の切り替えあり）、日付キーは日本時間に固定して検証する。`npm run check:streak` で実行。
 
 ## 補足
