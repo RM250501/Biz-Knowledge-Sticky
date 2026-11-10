@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "dev:api": "tsx server/triviaServer.ts",
-    "start": "tsx server/triviaServer.ts",
+    "dev:api": "tsx server/index.ts",
+    "start": "tsx server/index.ts",
     "serve:prod": "npm run build && npm run start",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "check:questions": "tsx scripts/validateQuestions.ts"
   },
   "dependencies": {
     "@google/genai": "^1.50.1",

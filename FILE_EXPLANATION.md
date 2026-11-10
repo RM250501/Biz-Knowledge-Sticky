@@ -35,8 +35,12 @@
   本番ビルド作成と確認。
 - `scripts.lint`:
   TypeScript の型チェック (`tsc --noEmit`)。
+- `scripts.dev:api` / `start`:
+  API サーバー (`server/index.ts`) を起動。
+- `scripts.check:questions`:
+  問題データの形式チェック (`scripts/validateQuestions.ts`)。
 - `dependencies`:
-  React、Gemini SDK、Recharts、Tailwind など実行時依存。
+  React、Gemini SDK（サーバー側のみで使用）、Recharts、Tailwind など実行時依存。
 
 ### package-lock.json
 - npm が自動生成する依存解決ファイル。
@@ -57,8 +61,10 @@
   React と Tailwind の Vite プラグインを有効化。
 - `loadEnv(mode, '.', '')`:
   `.env` 系の値を読み込み。
-- `define['process.env.GEMINI_API_KEY']`:
-  フロント側コードが参照する API キーをビルド時埋め込み。
+- `define['import.meta.env.VITE_DEBUG_MODE']`:
+  デバッグ用フラグ。`GEMINI_API_KEY` はクライアントに埋め込まない。
+- `server.proxy['/api']`:
+  開発時に `/api` へのリクエストを API サーバーへ転送。
 - `resolve.alias['@']`:
   `@` をプロジェクトルートの別名に設定。
 - `server.hmr`:
@@ -107,9 +113,9 @@
   - `UserStats`: 学習統計の全体構造。
   - `UserAccount`: ユーザー情報 (現在未使用)。
 - 定数:
-  - `CATEGORY_LABELS`: カテゴリ表示名の辞書。
+  - `CATEGORY_LABELS`: カテゴリ表示名の辞書（`shared/categories.ts` から再エクスポート）。
   - `INITIAL_STATS`: 初期状態。
-  - `QUESTIONS`: クイズ問題データ本体。
+- クイズ問題データは `src/data/questions/` に移動。
 
 ## src/components
 
@@ -146,19 +152,15 @@
   - `RadarChart`: カテゴリスキル
 
 ### src/components/QuizModule.tsx
-- 一般常識クイズ画面。
-- `selectedCategory`:
-  カテゴリ未選択時はカテゴリ選択 UI を表示。
-- カテゴリ選択時:
-  `QUESTIONS` から抽出しシャッフル。
-- `timeLeft`:
-  1 秒ごとのカウントダウン。0 で時間切れ回答処理。
-- `handleAnswer(idx)`:
-  - 回答状態を確定
-  - 解説文を表示
-  - 正解なら `onComplete(10, category)` でスコア加算
-- `nextQuestion()`:
-  次問へ進むかカテゴリ選択へ戻る。
+- 一般常識クイズ画面の入口。状態は `useQuizSession` に任せ、画面を切り替えるだけ。
+- `launchPreset`:
+  ダッシュボードのショートカットから渡された設定で即開始する。
+
+### src/components/quiz/
+- `types.ts`: 出題方法・終了条件・`QuizLaunchPreset` などの型と選択肢の定数。
+- `QuizSetup.tsx`: 学習設定画面（出題方法、終了条件、時間/問題数、カテゴリ）。カテゴリごとの問題数も表示。
+- `QuizPlay.tsx`: 出題画面（タイマー/進捗、選択肢、解説、次へボタン）。
+- `QuizSummary.tsx`: 結果画面（回答数・正解数、正誤表、コメント）。
 
 ### src/components/TriviaModule.tsx
 - 雑学カード表示とアウトプット記録。
@@ -173,21 +175,19 @@
   博識レベル、アウトプット数、ウケた回数、最近ログを表示。
 
 ### src/components/LocalModule.tsx
-- 現在地ベースのローカル情報表示。
-- `useGeolocation()`:
-  ブラウザ位置情報を取得。
-- `refreshData()`:
-  `getActualLocalInfo(lat, lon)` を呼び、住所・天気・地域ニュースを更新。
-- `useEffect`:
-  位置情報取得後に自動で初回ロード。
-- UI:
-  天気カード、地域ニュース、周辺スポット導線。
+- お天気情報画面の入口。データ取得は `useWeatherRegion` に任せ、各カードを並べる。
+
+### src/components/weather/
+- `WeatherSettingsPanel.tsx`: 現在地 / 地域指定の切り替えと地域名検索。
+- `CurrentWeatherCards.tsx`: 現在の天気カードと降水量レベルカード。
+- `ForecastCharts.tsx`: 3 時間ごとの降水量・気温グラフ（recharts）。
+- `WeatherConditionIcon.tsx`: 天気の文言からアイコンを選ぶ。
 
 ### src/components/NewsModule.tsx
 - 最新ニュース一覧表示。
 - `fetchNews(force = false)`:
   - 当日のキャッシュがあれば localStorage から復元
-  - ない場合 `getActualNewsTopics()` を呼んで取得
+  - ない場合 `fetchNewsTopics()` で API サーバー (`/api/news`) から取得
   - 取得結果を localStorage へ保存
 - `lastUpdated`:
   最終更新時刻を表示。
@@ -205,6 +205,19 @@
 - Geolocation API の結果を `location` と `error` で返す。
 - `navigator.geolocation.getCurrentPosition` を 1 回実行。
 - 未対応ブラウザ時はエラー文言を設定。
+
+### src/hooks/useQuizSession.ts
+- クイズ 1 セッション分の状態とロジック。
+- `start(preset?)`:
+  問題をシャッフルして出題リストを作る。各問題の選択肢の並びも毎回入れ替える。
+- `answer(idx)`:
+  回答を記録し、正解なら `onCorrect(10, category)` で XP を加算。
+- 時間制ではタイマーが 0 になると結果画面へ進む。
+- 結果画面に入ると `/api/quiz/report` でレポートを作る。通信に失敗したらローカル集計に切り替える。
+
+### src/hooks/useWeatherRegion.ts
+- 表示地域の設定（localStorage `biz_weather_settings_v1`）と天気データ取得。
+- 位置情報が取れないときは東京駅の座標を使う。
 
 ### src/hooks/useUserStats.ts
 - 学習統計の状態管理フック。
@@ -228,20 +241,52 @@
 - `cn(...inputs)`:
   `clsx` でクラス名を条件結合し、`tailwind-merge` で競合クラスを解決するユーティリティ。
 
+### src/lib/shuffle.ts
+- Fisher–Yates で配列を偏りなく並べ替える。
+
+## src/data
+
+### src/data/questions/
+- カテゴリごとの問題データ（`english.ts`、`kanji.ts`、`manners.ts`、`governance.ts`、`weather.ts`、`economy.ts`）。各 20 問。
+- `index.ts`: 全カテゴリを結合した `QUESTIONS` と、カテゴリ別の問題数 `QUESTION_COUNT_BY_CATEGORY`。
+- 問題を追加したら `npm run check:questions` で形式を確認する。
+
 ## src/services
 
-### src/services/geminiService.ts
-- Gemini API を呼ぶサービス群。
-- `getGenAI()`:
-  `GEMINI_API_KEY` を検証し、`GoogleGenAI` インスタンスを遅延生成・再利用。
-- `getAIExplanation(...)`:
-  クイズ回答の正誤に応じた短い日本語解説を生成。
-- `getActualLocalInfo(lat, lon)`:
-  現在地周辺の住所・天気・地域ニュースを JSON で取得。
-- `getActualNewsTopics()`:
-  IT/経済/政治社会カテゴリのニュースを JSON で取得。
-- `getDailyTrivia(dayOfWeek)`:
-  曜日カテゴリに応じた雑学ネタを JSON で生成（現状 UI では固定データ中心）。
+### src/services/apiClient.ts
+- API サーバーを呼ぶクライアント。Gemini API はブラウザから直接呼ばない。
+- `fetchNewsTopics(force)`: `/api/news` から最新ニュースを取得。
+- `requestQuizReport(sessionLog)`: `/api/quiz/report` からクイズ結果レポートを取得。
+
+### src/services/weatherService.ts
+- Open-Meteo などの外部 API から天気・予報・地名を取得する。
+
+## server
+
+### server/index.ts
+- Express の API サーバー。`/api/trivia`、`/api/news`、`/api/quiz/report` をまとめる。
+- `dist/` があればビルド済みフロントエンドも配信する。
+
+### server/gemini.ts
+- Gemini クライアントの生成と、使用モデル名 `GEMINI_MODEL`。`GEMINI_API_KEY` はここでだけ読む。
+
+### server/trivia/
+- `routes.ts`: 日替わり雑学の割り当て（同日同ブラウザは同じネタ、別ブラウザには別のネタ）。
+- `generator.ts`: 雑学の AI 生成、別の AI 呼び出しによる事実確認、フォールバックデータ。
+- `db.ts`: sql.js（SQLite）での割り当て保存。`.data/trivia.db` に書き出す。
+
+### server/routes/
+- `news.ts`: Google 検索連携で最新ニュースを取得。同じ日はメモリにキャッシュする。
+- `quizReport.ts`: クイズ結果の総括とコメントを AI で作る。キー未設定・失敗時はローカル集計を返す。
+
+## shared
+
+- `categories.ts`: カテゴリ表示名の辞書（クライアント・サーバー共通）。
+- `quizReport.ts`: レポートの型と、AI を使わないローカル集計 `buildLocalQuizReport`。
+
+## scripts
+
+- `validateQuestions.ts`: 問題データの ID 重複、選択肢数、正解番号、空欄などを検査する。
 
 ## 補足
 - 各 UI コンポーネントは `motion/react` を使って遷移・ホバー演出を付与。

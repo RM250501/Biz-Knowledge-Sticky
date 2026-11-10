@@ -5,7 +5,7 @@ Biz-Knowledge Sticky は、ビジネス一般常識を日々の習慣として�
 ## 主な機能
 
 - 成績レポート: XP、ランク、カテゴリ別スコア、学習カレンダーを表示
-- 一般常識ドリル: 6 カテゴリの 4 択クイズ、時間制 / 出題数制に対応
+- 一般常識ドリル: 6 カテゴリ × 20 問（計 120 問）の 4 択クイズ、時間制 / 出題数制に対応
 - 雑学ネタ帳: 1 ブラウザ 1 日 1 件の雑学を配布し、反応とメモを保存
 - お天気情報: 現在地または地域指定で、現在天気と予報を表示
 - 最新トピックス: Gemini API と Google Search で最新ニュースを収集
@@ -53,7 +53,7 @@ Biz-Knowledge Sticky は、ビジネス一般常識を日々の習慣として�
 
    npm run dev
 
-4. 別ターミナルで雑学配布 API サーバーを起動する
+4. 別ターミナルで API サーバーを起動する（雑学・ニュース・クイズレポート）
 
    npm run dev:api
 
@@ -64,18 +64,30 @@ Biz-Knowledge Sticky は、ビジネス一般常識を日々の習慣として�
 ## 利用可能なスクリプト
 
 - `npm run dev`: 開発サーバー起動
-- `npm run dev:api`: 雑学配布 API サーバー起動
+- `npm run dev:api`: API サーバー起動
 - `npm run start`: API サーバー起動
 - `npm run serve:prod`: 本番ビルド後に API サーバーを起動
 - `npm run build`: 本番ビルド作成
 - `npm run preview`: ビルド結果をローカル確認
 - `npm run lint`: TypeScript 型チェック
+- `npm run check:questions`: クイズ問題データの形式チェック
 - `npm run clean`: `dist` を削除
 
 ## 環境変数
 
-- `GEMINI_API_KEY`: Gemini API を利用する機能で必要
-- 未設定でも、ローカル保存ベースの機能や一部 UI は確認できる
+- `GEMINI_API_KEY`: Gemini API を利用する機能で必要。API サーバーだけが読み、ブラウザ向けのビルドには含めない
+- 未設定でも、クイズ（レポートはローカル集計）や天気など一部の機能は使える
+- `.env.local` は Git に含めない。キーを `.env.example` などのコミット対象ファイルに書かない
+
+## ディレクトリ構成
+
+- `src/`: フロントエンド（React）
+  - `components/quiz/`, `components/weather/`: 各モジュールの部品
+  - `data/questions/`: クイズ問題データ（カテゴリ別）
+  - `services/apiClient.ts`: API サーバーの呼び出し
+- `server/`: API サーバー（Express）。Gemini API の呼び出しはすべてここで行う
+- `shared/`: クライアントとサーバーで共有する型・関数
+- `scripts/`: 開発用スクリプト
 
 ## 参考
 
