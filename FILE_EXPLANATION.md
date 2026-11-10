@@ -39,6 +39,8 @@
   API サーバー (`server/index.ts`) を起動。
 - `scripts.check:questions`:
   問題データの形式チェック (`scripts/validateQuestions.ts`)。
+- `scripts.check:streak`:
+  連続ログイン日数の計算チェック (`scripts/checkStreak.ts`)。
 - `dependencies`:
   React、Gemini SDK（サーバー側のみで使用）、Recharts、Tailwind など実行時依存。
 
@@ -226,7 +228,10 @@
 - 永続化:
   `stats` 更新時に localStorage へ保存。
 - 連続ログイン判定:
-  `lastLoginDate` と今日の日付差で `loginStreak` を更新。
+  ローカルの日付で `lastLoginDate` と今日を比べ、`loginStreak` を更新（計算は `src/lib/streak.ts`）。
+  開いたまま日付をまたいでも、1 分ごとの確認とタブ復帰時の確認で更新される。
+- `markQuestionAnswered(questionId)`:
+  回答した問題 ID を `completedQuestions` に記録する。
 - `updateScore(points, category, isTrivia, triviaLogEntry)`:
   - 総スコア加算
   - カテゴリ別スコア更新（最大100）
@@ -240,6 +245,10 @@
 ### src/lib/utils.ts
 - `cn(...inputs)`:
   `clsx` でクラス名を条件結合し、`tailwind-merge` で競合クラスを解決するユーティリティ。
+
+### src/lib/streak.ts
+- `nextLoginStreak(prev, todayKey)`: 連続ログイン日数を計算する。
+- 旧バージョンの保存データ（`dateKeyVersion` なし、UTC の日付）は実際の日付と 1 日ずれることがあるため、差が 2 日までは連続として扱う。
 
 ### src/lib/shuffle.ts
 - Fisher–Yates で配列を偏りなく並べ替える。
@@ -273,7 +282,7 @@
 ### server/trivia/
 - `routes.ts`: 日替わり雑学の割り当て（同日同ブラウザは同じネタ、別ブラウザには別のネタ）。
 - `generator.ts`: 雑学の AI 生成、別の AI 呼び出しによる事実確認、フォールバックデータ。
-- `db.ts`: sql.js（SQLite）での割り当て保存。`.data/trivia.db` に書き出す。
+- `db.ts`: sql.js（SQLite）での割り当て保存。`.data/trivia.db` に書き出す（初回起動時に自動作成。Git の管理対象外）。
 
 ### server/routes/
 - `news.ts`: Google 検索連携で最新ニュースを取得。同じ日はメモリにキャッシュする。
@@ -287,6 +296,7 @@
 ## scripts
 
 - `validateQuestions.ts`: 問題データの ID 重複、選択肢数、正解番号、空欄などを検査する。
+- `checkStreak.ts`: 連続ログイン日数（`nextLoginStreak`）、日数差（`diffInDays`）、日付キー（`toLocalDateKey`）の計算を確認する。実行環境に左右されないよう、日数差は米国東部時間（夏時間の切り替えあり）、日付キーは日本時間に固定して検証する。`npm run check:streak` で実行。
 
 ## 補足
 - 各 UI コンポーネントは `motion/react` を使って遷移・ホバー演出を付与。

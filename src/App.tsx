@@ -28,7 +28,7 @@ import { useCurrentTime } from './hooks/useCurrentTime';
 
 export default function App() {
   // 学習進捗 state とスコア更新 API を取得。
-  const { stats, setStats, updateScore } = useUserStats();
+  const { stats, setStats, updateScore, markQuestionAnswered } = useUserStats();
   // 右側コンテンツで表示するモジュールのタブ状態。
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   // クイズ開始時のプリセット設定。
@@ -217,6 +217,7 @@ export default function App() {
               {activeTab === 'learning' && (
                 <QuizModule
                   onComplete={updateScore}
+                  onAnswered={markQuestionAnswered}
                   launchPreset={quizPreset}
                   onPresetConsumed={() => setQuizPreset(null)}
                 />

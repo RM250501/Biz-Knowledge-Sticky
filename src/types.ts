@@ -75,6 +75,8 @@ export interface UserStats {
   triviaLogs: TriviaLog[];
   loginStreak: number;
   lastLoginDate: string;
+  // 日付の保存形式（1 または未設定 = UTC、2 = ローカル日付）。
+  dateKeyVersion?: number;
 }
 
 // 将来拡張向けのアカウント構造（現 UI では未使用）。
@@ -106,4 +108,5 @@ export const INITIAL_STATS: UserStats = {
   triviaLogs: [],
   loginStreak: 0,
   lastLoginDate: '',
+  dateKeyVersion: 2,
 };

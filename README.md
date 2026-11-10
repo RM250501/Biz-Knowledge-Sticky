@@ -71,6 +71,7 @@ Biz-Knowledge Sticky は、ビジネス一般常識を日々の習慣として�
 - `npm run preview`: ビルド結果をローカル確認
 - `npm run lint`: TypeScript 型チェック
 - `npm run check:questions`: クイズ問題データの形式チェック
+- `npm run check:streak`: 連続ログイン日数の計算チェック
 - `npm run clean`: `dist` を削除
 
 ## 環境変数

@@ -15,6 +15,7 @@ import {
 } from 'recharts';
 import { UserStats, CATEGORY_LABELS } from '../types';
 import { cn } from '../lib/utils';
+import { toLocalDateKey } from '../../shared/date';
 import { motion, AnimatePresence } from 'motion/react';
 
 export const Dashboard = ({ stats, onStartTimedQuiz, onStartRandomQuiz, onStartCountQuiz }: { stats: UserStats; onStartTimedQuiz: () => void; onStartRandomQuiz: () => void; onStartCountQuiz: () => void }) => {
@@ -29,7 +30,7 @@ export const Dashboard = ({ stats, onStartTimedQuiz, onStartRandomQuiz, onStartC
     return () => window.cancelAnimationFrame(frameId);
   }, []);
 
-  const todayKey = new Date().toISOString().split('T')[0];
+  const todayKey = toLocalDateKey();
   const todayLog = stats.learningLog.find(log => log.date === todayKey);
 
   const strongestCategoryEntry = Object.entries(stats.categoryScores)
@@ -61,7 +62,7 @@ export const Dashboard = ({ stats, onStartTimedQuiz, onStartRandomQuiz, onStartC
 
   // 当月の日付配列を作り、該当日の学習ログを紐付ける。
   const calendarDays = Array.from({ length: currentMonthDays }, (_, i) => {
-    const date = new Date(today.getFullYear(), today.getMonth(), i + 1).toISOString().split('T')[0];
+    const date = toLocalDateKey(new Date(today.getFullYear(), today.getMonth(), i + 1));
     const log = stats.learningLog.find(l => l.date === date);
     return { day: i + 1, date, log };
   });
@@ -232,7 +233,7 @@ export const Dashboard = ({ stats, onStartTimedQuiz, onStartRandomQuiz, onStartC
                   ))}
                   {calendarDays.map(({ day, date, log }) => {
                     // 今日の日付を強調して現在位置を把握しやすくする。
-                    const isToday = today.toISOString().split('T')[0] === date;
+                    const isToday = todayKey === date;
                     const earnedXp = log?.earnedPoints || 0;
                     
                     // 日次獲得 XP に応じてカレンダー色を変える。

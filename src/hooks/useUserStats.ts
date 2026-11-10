@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { UserStats, INITIAL_STATS } from '../types';
+import { toLocalDateKey } from '../../shared/date';
+import { DATE_KEY_VERSION, nextLoginStreak } from '../lib/streak';
 
 export function useUserStats() {
   // リロード後も進捗を維持できるよう、localStorage から初期化する。
@@ -22,38 +24,33 @@ export function useUserStats() {
     localStorage.setItem('biz_knowledge_stats', JSON.stringify(stats));
   }, [stats]);
 
+  // 今日の日付（ローカル）。開いたまま日付をまたいでも気づけるよう、
+  // 1 分ごと・タブに戻ったときに確認し直す。
+  const [todayKey, setTodayKey] = useState(() => toLocalDateKey());
   useEffect(() => {
-    // 連続ログイン日数を判定する。
-    const today = new Date().toISOString().split('T')[0];
-    if (stats.lastLoginDate !== today) {
-      setStats(prev => {
-        let newStreak = prev.loginStreak || 0;
-        const lastLogin = prev.lastLoginDate;
-        
-        if (lastLogin) {
-          // 最終ログイン日と今日の日付差から連続日数を判定する。
-          const lastDate = new Date(lastLogin);
-          const currentDate = new Date(today);
-          const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          
-          if (diffDays === 1) {
-            newStreak += 1;
-          } else if (diffDays > 1) {
-            newStreak = 1;
-          }
-        } else {
-          newStreak = 1;
-        }
-        
-        return {
-          ...prev,
-          lastLoginDate: today,
-          loginStreak: newStreak
-        };
-      });
-    }
+    const check = () => setTodayKey(toLocalDateKey());
+    const timer = window.setInterval(check, 60_000);
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('focus', check);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', check);
+      window.removeEventListener('focus', check);
+    };
   }, []);
+
+  // 日付が変わったら連続ログイン日数を更新する。
+  useEffect(() => {
+    setStats(prev => {
+      if (prev.lastLoginDate === todayKey && prev.dateKeyVersion === DATE_KEY_VERSION) return prev;
+      return {
+        ...prev,
+        loginStreak: nextLoginStreak(prev, todayKey),
+        lastLoginDate: todayKey,
+        dateKeyVersion: DATE_KEY_VERSION,
+      };
+    });
+  }, [todayKey]);
 
   const updateScore = (points: number, category: string, isTrivia: boolean = false, triviaLogEntry?: any) => {
     try {
@@ -84,7 +81,7 @@ export function useUserStats() {
           : (prev.triviaLogs || []);
 
         // ダッシュボード用に日次の集計ログを更新。
-        const today = new Date().toISOString().split('T')[0];
+        const today = toLocalDateKey();
         const newLearningLog = Array.isArray(prev.learningLog) ? [...prev.learningLog] : [];
         const todayLogIdx = newLearningLog.findIndex(log => log.date === today);
         
@@ -125,5 +122,14 @@ export function useUserStats() {
     }
   };
 
-  return { stats, setStats, updateScore };
+  // 回答した問題 ID を記録する（正誤は問わず、重複なし）。
+  const markQuestionAnswered = useCallback((questionId: string) => {
+    setStats(prev => {
+      const answered = prev.completedQuestions || [];
+      if (answered.includes(questionId)) return prev;
+      return { ...prev, completedQuestions: [...answered, questionId] };
+    });
+  }, []);
+
+  return { stats, setStats, updateScore, markQuestionAnswered };
 }

@@ -9,12 +9,13 @@ export type { QuizLaunchPreset } from './quiz/types';
 
 interface QuizModuleProps {
   onComplete: (score: number, category: string) => void;
+  onAnswered?: (questionId: string) => void;
   launchPreset: QuizLaunchPreset | null;
   onPresetConsumed: () => void;
 }
 
-export const QuizModule = ({ onComplete, launchPreset, onPresetConsumed }: QuizModuleProps) => {
-  const session = useQuizSession(onComplete);
+export const QuizModule = ({ onComplete, onAnswered, launchPreset, onPresetConsumed }: QuizModuleProps) => {
+  const session = useQuizSession(onComplete, onAnswered);
 
   // ダッシュボードのショートカットから来た場合は、設定画面を飛ばして開始する。
   useEffect(() => {
