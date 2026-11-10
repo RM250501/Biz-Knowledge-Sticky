@@ -226,7 +226,10 @@
 - 永続化:
   `stats` 更新時に localStorage へ保存。
 - 連続ログイン判定:
-  `lastLoginDate` と今日の日付差で `loginStreak` を更新。
+  ローカルの日付で `lastLoginDate` と今日を比べ、`loginStreak` を更新（計算は `src/lib/streak.ts`）。
+  開いたまま日付をまたいでも、1 分ごとの確認とタブ復帰時の確認で更新される。
+- `markQuestionAnswered(questionId)`:
+  回答した問題 ID を `completedQuestions` に記録する。
 - `updateScore(points, category, isTrivia, triviaLogEntry)`:
   - 総スコア加算
   - カテゴリ別スコア更新（最大100）
@@ -240,6 +243,10 @@
 ### src/lib/utils.ts
 - `cn(...inputs)`:
   `clsx` でクラス名を条件結合し、`tailwind-merge` で競合クラスを解決するユーティリティ。
+
+### src/lib/streak.ts
+- `nextLoginStreak(prev, todayKey)`: 連続ログイン日数を計算する。
+- 旧バージョンの保存データ（`dateKeyVersion` なし、UTC の日付）は実際の日付と 1 日ずれることがあるため、差が 2 日までは連続として扱う。
 
 ### src/lib/shuffle.ts
 - Fisher–Yates で配列を偏りなく並べ替える。

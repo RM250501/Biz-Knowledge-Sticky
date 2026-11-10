@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { UserStats, INITIAL_STATS } from '../types';
-import { diffInDays, toLocalDateKey } from '../../shared/date';
+import { toLocalDateKey } from '../../shared/date';
+import { DATE_KEY_VERSION, nextLoginStreak } from '../lib/streak';
 
 export function useUserStats() {
   // リロード後も進捗を維持できるよう、localStorage から初期化する。
@@ -23,38 +24,33 @@ export function useUserStats() {
     localStorage.setItem('biz_knowledge_stats', JSON.stringify(stats));
   }, [stats]);
 
+  // 今日の日付（ローカル）。開いたまま日付をまたいでも気づけるよう、
+  // 1 分ごと・タブに戻ったときに確認し直す。
+  const [todayKey, setTodayKey] = useState(() => toLocalDateKey());
   useEffect(() => {
-    // 連続ログイン日数を判定する。日付はローカル時刻（日本なら 0 時切り替え）で扱う。
-    const today = toLocalDateKey();
-    if (stats.lastLoginDate !== today) {
-      setStats(prev => {
-        let newStreak = prev.loginStreak || 0;
-        const lastLogin = prev.lastLoginDate;
-
-        if (lastLogin) {
-          // 最終ログイン日と今日の日付差から連続日数を判定する。
-          // 以前のバージョンは UTC の日付で保存していたため、差が 0 以下（同じ日扱い）もありうる。
-          const diffDays = diffInDays(lastLogin, today);
-          if (diffDays === 1) {
-            newStreak += 1;
-          } else if (diffDays > 1) {
-            newStreak = 1;
-          } else if (newStreak === 0) {
-            newStreak = 1;
-          }
-        } else {
-          newStreak = 1;
-        }
-
-
-        return {
-          ...prev,
-          lastLoginDate: today,
-          loginStreak: newStreak
-        };
-      });
-    }
+    const check = () => setTodayKey(toLocalDateKey());
+    const timer = window.setInterval(check, 60_000);
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('focus', check);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', check);
+      window.removeEventListener('focus', check);
+    };
   }, []);
+
+  // 日付が変わったら連続ログイン日数を更新する。
+  useEffect(() => {
+    setStats(prev => {
+      if (prev.lastLoginDate === todayKey && prev.dateKeyVersion === DATE_KEY_VERSION) return prev;
+      return {
+        ...prev,
+        loginStreak: nextLoginStreak(prev, todayKey),
+        lastLoginDate: todayKey,
+        dateKeyVersion: DATE_KEY_VERSION,
+      };
+    });
+  }, [todayKey]);
 
   const updateScore = (points: number, category: string, isTrivia: boolean = false, triviaLogEntry?: any) => {
     try {
