@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { GEMINI_MODEL, getGenAI, hasGeminiKey } from '../gemini';
+import { getGeminiModel, getGenAI, hasGeminiKey } from '../gemini';
 import { toLocalDateKey } from '../../shared/date';
 
 // refresh=1 でも、この間隔より短い再取得はキャッシュを返す。
@@ -24,7 +24,7 @@ async function fetchNewsTopics(): Promise<NewsCategory[]> {
     信頼できるソース（日本経済新聞、ITmedia、ロイター、読売新聞、東洋経済オンラインなど）の記事を優先してください。`;
 
   const response = await ai.models.generateContent({
-    model: GEMINI_MODEL,
+    model: getGeminiModel(),
     contents: prompt,
     config: {
       tools: [{ googleSearch: {} }],

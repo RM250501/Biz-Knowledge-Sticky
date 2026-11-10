@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { GEMINI_MODEL, getGenAI } from '../gemini';
+import { getGeminiModel, getGenAI } from '../gemini';
 import type { Trivia } from './types';
 
 const THEMES = [
@@ -132,7 +132,7 @@ export async function generateAITrivia(
 `;
 
   const response = await ai.models.generateContent({
-    model: GEMINI_MODEL,
+    model: getGeminiModel(),
     contents: prompt,
     config: {
       responseMimeType: 'application/json',
@@ -179,7 +179,7 @@ export async function verifyAITrivia(trivia: Trivia) {
 `;
 
   const response = await ai.models.generateContent({
-    model: GEMINI_MODEL,
+    model: getGeminiModel(),
     contents: prompt,
     config: {
       responseMimeType: 'application/json',

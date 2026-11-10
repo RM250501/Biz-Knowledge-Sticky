@@ -13,7 +13,8 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "check:questions": "tsx scripts/validateQuestions.ts",
-    "check:streak": "tsx scripts/checkStreak.ts"
+    "check:streak": "tsx scripts/checkStreak.ts",
+    "check:gemini": "tsx scripts/checkGemini.ts"
   },
   "dependencies": {
     "@google/genai": "^1.50.1",

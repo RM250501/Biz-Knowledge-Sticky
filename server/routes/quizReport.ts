@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { GEMINI_MODEL, getGenAI, hasGeminiKey } from '../gemini';
+import { getGeminiModel, getGenAI, hasGeminiKey } from '../gemini';
 import {
   buildLocalQuizReport,
   toReportRows,
@@ -59,7 +59,7 @@ ${summaryItems}
 `;
 
   const response = await ai.models.generateContent({
-    model: GEMINI_MODEL,
+    model: getGeminiModel(),
     contents: prompt,
     config: {
       responseMimeType: 'application/json',
