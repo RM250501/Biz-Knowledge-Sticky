@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { 
   LayoutDashboard, 
@@ -16,12 +16,38 @@ import {
 
 import { MenuSticky } from './components/MenuSticky';
 import { ContentWindow } from './components/ContentWindow';
-import { Dashboard } from './components/Dashboard';
-import { QuizModule } from './components/QuizModule';
-import { TriviaModule } from './components/TriviaModule';
-import { LocalModule } from './components/LocalModule';
-import { NewsModule } from './components/NewsModule';
-import { QuizLaunchPreset } from './components/QuizModule';
+import type { QuizLaunchPreset } from './components/QuizModule';
+
+// 各モジュールは表示するときに読み込む（グラフライブラリなどを最初に読み込まないため）。
+const loadDashboard = () => import('./components/Dashboard');
+const loadQuizModule = () => import('./components/QuizModule');
+const loadTriviaModule = () => import('./components/TriviaModule');
+const loadLocalModule = () => import('./components/LocalModule');
+const loadNewsModule = () => import('./components/NewsModule');
+
+const Dashboard = lazy(() => loadDashboard().then((m) => ({ default: m.Dashboard })));
+const QuizModule = lazy(() => loadQuizModule().then((m) => ({ default: m.QuizModule })));
+const TriviaModule = lazy(() => loadTriviaModule().then((m) => ({ default: m.TriviaModule })));
+const LocalModule = lazy(() => loadLocalModule().then((m) => ({ default: m.LocalModule })));
+const NewsModule = lazy(() => loadNewsModule().then((m) => ({ default: m.NewsModule })));
+
+// 最初の画面が表示されたあと、手が空いたときに残りのモジュールも読み込んでおく。
+// タブを切り替えたときに待たされないようにするため。
+function prefetchModules() {
+  const run = () => {
+    void Promise.all([loadQuizModule(), loadTriviaModule(), loadLocalModule(), loadNewsModule()]).catch(() => {
+      // 読み込みに失敗しても、タブを開いたときに改めて読み込む。
+    });
+  };
+  if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout: 3000 });
+  else setTimeout(run, 1500);
+}
+
+const ModuleLoading = () => (
+  <div className="flex h-64 items-center justify-center text-sm text-gray-400" role="status">
+    読み込み中...
+  </div>
+);
 
 import { useUserStats } from './hooks/useUserStats';
 import { useCurrentTime } from './hooks/useCurrentTime';
@@ -84,6 +110,10 @@ export default function App() {
       }
     }
   }, [stats.loginStreak]);
+
+  useEffect(() => {
+    prefetchModules();
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -206,6 +236,7 @@ export default function App() {
               color={activeItem.color}
             >
               {/* 選択中タブに応じてモジュールを切り替える。 */}
+              <Suspense fallback={<ModuleLoading />}>
               {activeTab === 'dashboard' && (
                 <Dashboard
                   stats={stats}
@@ -225,6 +256,7 @@ export default function App() {
               {activeTab === 'trivia' && <TriviaModule stats={stats} onUpdateStats={updateScore} />}
               {activeTab === 'local' && <LocalModule />}
               {activeTab === 'news' && <NewsModule />}
+              </Suspense>
             </ContentWindow>
           </AnimatePresence>
         </div>

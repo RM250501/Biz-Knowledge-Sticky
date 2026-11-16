@@ -38,5 +38,26 @@ export default defineConfig(({mode}) => {
     preview: {
       proxy: apiProxy,
     },
+    build: {
+      rollupOptions: {
+        output: {
+          // ライブラリを用途ごとに別ファイルにする。アプリのコードだけ変えたときは、
+          // ライブラリ部分はブラウザのキャッシュがそのまま使われる。
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined;
+            // グラフ（recharts とその専用の依存）。成績レポート・お天気を開くまで読み込まない。
+            // clsx などアプリ本体でも使うものは入れない（入れると最初に読み込まれてしまう）。
+            if (/[\\/]node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor|internmap|decimal\.js-light|es-toolkit|immer|reselect|redux|@reduxjs|react-redux|eventemitter3|tiny-invariant)[\\/]/.test(id)) return 'charts';
+            // アプリ本体でも使う小さなライブラリ。明示しないと、それを読み込む charts に取り込まれてしまう。
+            if (/[\\/]node_modules[\\/](clsx|tailwind-merge|lucide-react)[\\/]/.test(id)) return 'ui';
+            if (/[\\/]node_modules[\\/](motion|framer-motion|motion-dom|motion-utils)[\\/]/.test(id)) return 'motion';
+            if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'react';
+            // それ以外は Vite に任せる。ただし charts から読み込まれるものは charts に取り込まれるので、
+            // アプリ本体でも使うライブラリを足したときは、上の 'ui' に加えること。
+            return undefined;
+          },
+        },
+      },
+    },
   };
 });
