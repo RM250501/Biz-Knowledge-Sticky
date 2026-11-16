@@ -38,5 +38,8 @@ jobs:
       - name: 連続ログイン日数・日付計算のチェック
         run: npm run check:streak
 
+      - name: カテゴリ別正答率のチェック
+        run: npm run check:stats
+
       - name: 本番ビルド
         run: npm run build

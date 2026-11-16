@@ -9,7 +9,7 @@ export type { QuizLaunchPreset } from './quiz/types';
 
 interface QuizModuleProps {
   onComplete: (score: number, category: string) => void;
-  onAnswered?: (questionId: string) => void;
+  onAnswered?: (questionId: string, category: string, isCorrect: boolean) => void;
   launchPreset: QuizLaunchPreset | null;
   onPresetConsumed: () => void;
 }

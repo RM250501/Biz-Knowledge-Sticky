@@ -52,7 +52,7 @@ function saveSessionLog(log: QuizSessionLogItem[], report: QuizReport) {
 
 export function useQuizSession(
   onCorrect: (points: number, category: string) => void,
-  onAnswered?: (questionId: string) => void,
+  onAnswered?: (questionId: string, category: string, isCorrect: boolean) => void,
 ) {
   const [state, setState] = useState<QuizSessionState>('setup');
   const [settings, setSettings] = useState<QuizSettings>(DEFAULT_QUIZ_SETTINGS);
@@ -130,7 +130,7 @@ export function useQuizSession(
     setSelectedOption(optionIdx);
 
     const isCorrect = optionIdx === currentQuestion.correctIndex;
-    onAnswered?.(currentQuestion.id);
+    onAnswered?.(currentQuestion.id, currentQuestion.category, isCorrect);
     if (isCorrect) {
       // 正解時のみカテゴリに XP を加算する。
       onCorrect(10, currentQuestion.category);

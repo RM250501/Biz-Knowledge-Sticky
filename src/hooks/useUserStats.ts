@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { UserStats, INITIAL_STATS } from '../types';
 import { toLocalDateKey } from '../../shared/date';
 import { DATE_KEY_VERSION, nextLoginStreak } from '../lib/streak';
+import { addAnswer } from '../lib/categoryStats';
 
 const STORAGE_KEY = 'biz_knowledge_stats';
 
@@ -173,14 +174,17 @@ export function useUserStats() {
     }
   };
 
-  // 回答した問題 ID を記録する（正誤は問わず、重複なし）。
-  const markQuestionAnswered = useCallback((questionId: string) => {
+  // 1 問の回答を記録する。回答した問題 ID（重複なし）と、カテゴリ別の回答数・正解数を更新する。
+  const recordAnswer = useCallback((questionId: string, category: string, isCorrect: boolean) => {
     updateStats(prev => {
       const answered = prev.completedQuestions || [];
-      if (answered.includes(questionId)) return prev;
-      return { ...prev, completedQuestions: [...answered, questionId] };
+      return {
+        ...prev,
+        completedQuestions: answered.includes(questionId) ? answered : [...answered, questionId],
+        categoryStats: addAnswer(prev.categoryStats, category, isCorrect),
+      };
     });
   }, [updateStats]);
 
-  return { stats, setStats, updateScore, markQuestionAnswered };
+  return { stats, setStats, updateScore, recordAnswer };
 }
