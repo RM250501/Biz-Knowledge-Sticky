@@ -60,6 +60,9 @@ export function useQuizSession(
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
+  // 時間制の終了時刻（ミリ秒）。残り時間はここから毎回計算するので、
+  // 解説を読んでいる間もタブがバックグラウンドの間も、実際の経過時間どおりに減る。
+  const [deadline, setDeadline] = useState<number | null>(null);
   const [sessionLog, setSessionLog] = useState<QuizSessionLogItem[]>([]);
   const [report, setReport] = useState<QuizReport | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
@@ -105,16 +108,20 @@ export function useQuizSession(
     setReportLoading(false);
     setSetupMessage('');
     setSummaryMessage('');
-    setTimeLeft(next.endMode === 'time' ? next.durationMinutes * 60 : 0);
+    const durationSec = next.endMode === 'time' ? next.durationMinutes * 60 : 0;
+    setTimeLeft(durationSec);
+    setDeadline(next.endMode === 'time' ? Date.now() + durationSec * 1000 : null);
     setState('quiz');
   }, [settings]);
 
   const finish = useCallback((reason: string) => {
+    setDeadline(null);
     setSummaryMessage(reason);
     setState('summary');
   }, []);
 
   const backToSetup = useCallback(() => {
+    setDeadline(null);
     setState('setup');
     setQuestions([]);
     setCurrentIdx(0);
@@ -158,16 +165,24 @@ export function useQuizSession(
     finish(settings.endMode === 'count' ? '出題数に達しました' : '用意された問題をすべて解きました');
   }, [isLastQuestion, settings.endMode, finish]);
 
-  // 時間制: 未回答の問題を表示している間だけカウントダウンする。
+  // 時間制: 解説を表示している間も止めずにカウントダウンし、0 になったら終了する。
+  // 以前は解説の表示中にタイマーが止まり、解説を開いたままにすれば時間制限をなくせてしまっていた。
   useEffect(() => {
-    if (state !== 'quiz' || settings.endMode !== 'time' || isAnswered || !currentQuestion) return;
-    if (timeLeft <= 0) {
-      finish('時間切れ');
-      return;
-    }
-    const timer = setTimeout(() => setTimeLeft((t) => t - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [state, settings.endMode, isAnswered, currentQuestion, timeLeft, finish]);
+    if (state !== 'quiz' || deadline === null) return;
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      setTimeLeft(remaining);
+      if (remaining === 0) finish('時間切れ');
+    };
+    tick();
+    const timer = window.setInterval(tick, 250);
+    // タブに戻ったときにすぐ表示を合わせる（バックグラウンドではタイマーが間引かれるため）。
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, [state, deadline, finish]);
 
   // 結果画面に入ったらレポートを作る。サーバーに届かなければローカル集計に切り替える。
   useEffect(() => {
