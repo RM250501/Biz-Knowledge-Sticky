@@ -73,7 +73,7 @@
   `DISABLE_HMR` でホットリロードを切替。
 
 ### .github/workflows/ci.yml
-- GitHub Actions の CI。PR と main への push で、型チェック・問題データチェック・日付計算チェック・ビルドを実行する。
+- GitHub Actions の CI。PR と main への push で、型チェック・問題データチェック・日付計算チェック・正答率チェック・ビルドを実行する。
 
 ### README.md
 - アプリ概要、機能、セットアップ、データ保存仕様のユーザー向け説明。
@@ -235,8 +235,8 @@
 - 連続ログイン判定:
   ローカルの日付で `lastLoginDate` と今日を比べ、`loginStreak` を更新（計算は `src/lib/streak.ts`）。
   開いたまま日付をまたいでも、1 分ごとの確認とタブ復帰時の確認で更新される。
-- `markQuestionAnswered(questionId)`:
-  回答した問題 ID を `completedQuestions` に記録する。
+- `recordAnswer(questionId, category, isCorrect)`:
+  回答した問題 ID を `completedQuestions` に記録し、カテゴリ別の回答数・正解数（`categoryStats`）を更新する。
 - `updateScore(points, category, isTrivia, triviaLogEntry)`:
   - 総スコア加算
   - カテゴリ別スコア更新（最大100）
@@ -250,6 +250,10 @@
 ### src/lib/utils.ts
 - `cn(...inputs)`:
   `clsx` でクラス名を条件結合し、`tailwind-merge` で競合クラスを解決するユーティリティ。
+
+### src/lib/categoryStats.ts
+- カテゴリ別の回答数・正解数（`categoryStats`）から、正答率・レーダーチャートのデータ・得意分野を計算する。
+- 得意分野は、3 問以上回答し 1 問以上正解した分野のうち、正答率がいちばん高いもの（同率なら回答数が多いほう）。
 
 ### src/lib/streak.ts
 - `nextLoginStreak(prev, todayKey)`: 連続ログイン日数を計算する。
@@ -305,6 +309,7 @@
 ## scripts
 
 - `validateQuestions.ts`: 問題データの ID 重複、選択肢数、正解番号、空欄などを検査する。
+- `checkStats.ts`: カテゴリ別正答率（`src/lib/categoryStats.ts`）の計算を確認する。`npm run check:stats` で実行。
 - `checkGemini.ts`: Gemini API に実際に接続し、モデルの存在・構造化出力・Google 検索連携を確認する。API キーが必要なので CI では実行しない。`npm run check:gemini` で実行。
 - `checkStreak.ts`: 連続ログイン日数（`nextLoginStreak`）、日数差（`diffInDays`）、日付キー（`toLocalDateKey`）の計算を確認する。実行環境に左右されないよう、日数差は米国東部時間（夏時間の切り替えあり）、日付キーは日本時間に固定して検証する。`npm run check:streak` で実行。
 

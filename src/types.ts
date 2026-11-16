@@ -64,12 +64,21 @@ export interface WeatherBundle {
   alerts: WeatherAlert[];
 }
 
+// カテゴリ別の回答数と正解数（正答率の計算に使う）。
+export interface CategoryStat {
+  answered: number;
+  correct: number;
+}
+
 // localStorage に保存する学習進捗の集約状態。
 export interface UserStats {
   rank: string;
   score: number;
   completedQuestions: string[];
+  // カテゴリ別の獲得 XP（上限 100）。正答率は categoryStats を使う。
   categoryScores: Record<string, number>;
+  // カテゴリ別の回答数・正解数。以前のバージョンのデータにはない。
+  categoryStats?: Record<string, CategoryStat>;
   learningLog: { date: string; score: number; earnedPoints: number; categories: string[]; triviaCount: number }[];
   knowledgeLevel: number;
   triviaLogs: TriviaLog[];

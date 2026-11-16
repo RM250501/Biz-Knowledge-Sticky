@@ -14,6 +14,7 @@
     "lint": "tsc --noEmit",
     "check:questions": "tsx scripts/validateQuestions.ts",
     "check:streak": "tsx scripts/checkStreak.ts",
+    "check:stats": "tsx scripts/checkStats.ts",
     "check:gemini": "tsx scripts/checkGemini.ts"
   },
   "dependencies": {

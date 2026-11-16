@@ -72,6 +72,7 @@ Biz-Knowledge Sticky は、ビジネス一般常識を日々の習慣として�
 - `npm run lint`: TypeScript 型チェック
 - `npm run check:questions`: クイズ問題データの形式チェック
 - `npm run check:streak`: 連続ログイン日数の計算チェック
+- `npm run check:stats`: カテゴリ別正答率の計算チェック
 - `npm run check:gemini`: Gemini API に実際に接続し、モデル・構造化出力・Google 検索連携が使えるか確認（API キーが必要）
 - `npm run clean`: `dist` を削除
 
@@ -82,6 +83,7 @@ GitHub Actions（`.github/workflows/ci.yml`）で、PR ごとと main への pus
 - `npm run lint`（型チェック）
 - `npm run check:questions`（クイズ問題データのチェック）
 - `npm run check:streak`（連続ログイン日数・日付計算のチェック）
+- `npm run check:stats`（カテゴリ別正答率のチェック）
 - `npm run build`（本番ビルド）
 
 ## 環境変数

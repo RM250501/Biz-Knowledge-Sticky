@@ -11,11 +11,13 @@ import {
   RadarChart,
   PolarGrid,
   PolarAngleAxis,
+  PolarRadiusAxis,
   Radar
 } from 'recharts';
 import { UserStats, CATEGORY_LABELS } from '../types';
 import { cn } from '../lib/utils';
 import { toLocalDateKey } from '../../shared/date';
+import { buildRadarData, MIN_ANSWERS_FOR_RANKING, strongestCategory, type RadarPoint } from '../lib/categoryStats';
 import { motion, AnimatePresence } from 'motion/react';
 
 export const Dashboard = ({ stats, onStartTimedQuiz, onStartRandomQuiz, onStartCountQuiz }: { stats: UserStats; onStartTimedQuiz: () => void; onStartRandomQuiz: () => void; onStartCountQuiz: () => void }) => {
@@ -33,13 +35,9 @@ export const Dashboard = ({ stats, onStartTimedQuiz, onStartRandomQuiz, onStartC
   const todayKey = toLocalDateKey();
   const todayLog = stats.learningLog.find(log => log.date === todayKey);
 
-  const strongestCategoryEntry = Object.entries(stats.categoryScores)
-    .filter(([key]) => CATEGORY_LABELS[key])
-    .sort(([, a], [, b]) => b - a)[0];
-
-  const strongestCategoryLabel = strongestCategoryEntry
-    ? CATEGORY_LABELS[strongestCategoryEntry[0]] || strongestCategoryEntry[0]
-    : 'まだデータなし';
+  // 正答率がいちばん高い分野（各分野 MIN_ANSWERS_FOR_RANKING 問以上回答したものから選ぶ）。
+  const strongestKey = strongestCategory(stats);
+  const strongestCategoryLabel = strongestKey ? CATEGORY_LABELS[strongestKey] || strongestKey : 'まだデータなし';
 
   const nextAction = todayLog
     ? '今日の学習は記録済み。雑学を1つアウトプットして、知識レベルも伸ばすのがおすすめです。'
@@ -47,14 +45,9 @@ export const Dashboard = ({ stats, onStartTimedQuiz, onStartRandomQuiz, onStartC
       ? 'まずは一般常識ドリルを1問解いて、最初のXPを積みましょう。'
       : '学習履歴があるので、雑学ネタ帳でアウトプットを加えると伸びが見えやすくなります。';
 
-  // カテゴリ別スコアをレーダーチャート用データへ変換。
-  const radarData = Object.entries(stats.categoryScores)
-    .filter(([key]) => CATEGORY_LABELS[key])
-    .map(([key, value]) => ({
-      subject: CATEGORY_LABELS[key]?.toUpperCase() || key.toUpperCase(),
-      A: value,
-      fullMark: 100,
-    }));
+  // カテゴリ別の正答率をレーダーチャート用データへ変換。
+  const radarData = buildRadarData(stats);
+  const hasAnyAnswer = radarData.some((point) => point.answered > 0);
 
   const today = new Date();
   const currentMonthDays = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
@@ -105,7 +98,11 @@ export const Dashboard = ({ stats, onStartTimedQuiz, onStartRandomQuiz, onStartC
               <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">BEST</span>
             </div>
             <div className="text-2xl font-black text-blue-600">{showDetails ? strongestCategoryLabel : strongestCategoryLabel.slice(0, 2)}</div>
-            {showDetails && <p className="text-xs text-gray-500 mt-1">今いちばん伸びている分野</p>}
+            {showDetails && (
+              <p className="text-xs text-gray-500 mt-1">
+                {strongestKey ? '正答率がいちばん高い分野' : `${MIN_ANSWERS_FOR_RANKING}問以上解いて正解した分野から表示されます`}
+              </p>
+            )}
           </div>
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between mb-2">
@@ -315,6 +312,9 @@ export const Dashboard = ({ stats, onStartTimedQuiz, onStartRandomQuiz, onStartC
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Award className="text-purple-500" /> {showDetails ? 'Skill Radar' : '傾向'}
         </h3>
+        <p className="text-xs text-gray-500 -mt-2 mb-2">
+          {hasAnyAnswer ? '分野ごとの正答率（%）' : 'ドリルを解くと、分野ごとの正答率が表示されます'}
+        </p>
         <div className="flex-1 min-h-[320px] min-w-0">
           {chartsReady ? (
             <ResponsiveContainer width="100%" height={320} minWidth={0} minHeight={320}>
@@ -322,9 +322,17 @@ export const Dashboard = ({ stats, onStartTimedQuiz, onStartRandomQuiz, onStartC
                 {/* レーダー面でカテゴリ間のバランスを可視化する。 */}
                 <PolarGrid stroke="#e5e7eb" />
                 <PolarAngleAxis dataKey="subject" fontSize={10} />
+                <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
+                <Tooltip
+                  formatter={(_value, _name, item) => {
+                    const point = item?.payload as RadarPoint | undefined;
+                    if (!point || point.answered === 0) return ['未回答', '正答率'];
+                    return [`${point.accuracy}%（${point.answered}問中${point.correct}問正解）`, '正答率'];
+                  }}
+                />
                 <Radar 
-                  name="Skills" 
-                  dataKey="A" 
+                  name="正答率" 
+                  dataKey="accuracy" 
                   stroke="#8b5cf6" 
                   fill="#8b5cf6" 
                   fillOpacity={0.6} 
