@@ -268,7 +268,7 @@
 ## src/data
 
 ### src/data/questions/
-- カテゴリごとの問題データ（`english.ts`、`kanji.ts`、`manners.ts`、`governance.ts`、`weather.ts`、`economy.ts`）。各 20 問。
+- カテゴリごとの問題データ（`english.ts`、`kanji.ts`、`manners.ts`、`governance.ts`、`weather.ts`、`economy.ts`）。各 40 問。
 - `index.ts`: 全カテゴリを結合した `QUESTIONS` と、カテゴリ別の問題数 `QUESTION_COUNT_BY_CATEGORY`。
 - 問題を追加したら `npm run check:questions` で形式を確認する。
 
