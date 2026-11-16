@@ -1,9 +1,18 @@
 import { Router } from 'express';
-import { getGeminiModel, getGenAI, hasGeminiKey } from '../gemini';
+import {
+  getGeminiModel,
+  getGenAI,
+  hasGeminiKey,
+  isQuotaError,
+  markQuotaExceeded,
+  quotaCooldownRemainingMs,
+} from '../gemini';
 import { toLocalDateKey } from '../../shared/date';
 
 // refresh=1 でも、この間隔より短い再取得はキャッシュを返す。
 const MIN_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+// 利用枠以外の理由で失敗したときも、この間は再取得せずに失敗を返す（連続呼び出しを防ぐ）。
+const FAILURE_RETRY_INTERVAL_MS = 2 * 60 * 1000;
 
 export type NewsArticle = { title: string; source: string; url: string };
 export type NewsCategory = { id: string; name: string; articles: NewsArticle[] };
@@ -75,6 +84,14 @@ export const newsRouter = Router();
 
 // 取得中のリクエストがあれば、それを共有して AI 呼び出しを 1 回にまとめる。
 let inflight: Promise<NewsCategory[]> | null = null;
+// 直近の失敗時刻（利用枠以外）。
+let lastFailureAt = 0;
+
+function sendQuotaExceeded(res: import('express').Response, remainingMs: number) {
+  const retryAfterSec = Math.ceil(remainingMs / 1000);
+  res.setHeader('Retry-After', String(retryAfterSec));
+  res.status(429).json({ error: 'quota_exceeded', retryAfterSec });
+}
 
 function fetchNewsShared(todayKey: string) {
   if (!inflight) {
@@ -105,14 +122,41 @@ newsRouter.get('/', async (req, res) => {
     return;
   }
 
+  // 利用枠超過のクールダウン中、または直前に失敗したばかりなら、Gemini を呼ばずに返す。
+  // 古いキャッシュがあれば、エラーにせずそれを返す。
+  const cooldownMs = quotaCooldownRemainingMs();
+  const recentlyFailed = Date.now() - lastFailureAt < FAILURE_RETRY_INTERVAL_MS;
+  if (cooldownMs > 0 || recentlyFailed) {
+    if (cache && cache.categories.length > 0) {
+      res.json({ categories: cache.categories, source: 'stale' });
+    } else if (cooldownMs > 0) {
+      sendQuotaExceeded(res, cooldownMs);
+    } else {
+      res.status(502).json({ error: 'upstream_error' });
+    }
+    return;
+  }
+
   try {
     const categories = await fetchNewsShared(todayKey);
     if (categories.length === 0) {
+      lastFailureAt = Date.now();
       res.status(502).json({ error: 'empty_response' });
       return;
     }
+    lastFailureAt = 0;
     res.json({ categories, source: 'new' });
   } catch (error) {
+    if (isQuotaError(error)) {
+      markQuotaExceeded(error);
+      if (cache && cache.categories.length > 0) {
+        res.json({ categories: cache.categories, source: 'stale' });
+      } else {
+        sendQuotaExceeded(res, quotaCooldownRemainingMs());
+      }
+      return;
+    }
+    lastFailureAt = Date.now();
     console.error('[news] fetch failed:', error);
     res.status(502).json({ error: 'upstream_error' });
   }

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getGeminiModel, getGenAI, hasGeminiKey } from '../gemini';
+import { getGeminiModel, getGenAI, hasGeminiKey, isQuotaError, markQuotaExceeded, quotaCooldownRemainingMs } from '../gemini';
 import {
   buildLocalQuizReport,
   toReportRows,
@@ -95,7 +95,8 @@ quizReportRouter.post('/', async (req, res) => {
     return;
   }
 
-  if (!hasGeminiKey()) {
+  // キー未設定・利用枠超過のクールダウン中は、AI を呼ばずにローカル集計を返す。
+  if (!hasGeminiKey() || quotaCooldownRemainingMs() > 0) {
     res.json({ report: buildLocalQuizReport(sessionLog) });
     return;
   }
@@ -103,6 +104,7 @@ quizReportRouter.post('/', async (req, res) => {
   try {
     res.json({ report: await generateAIReport(sessionLog) });
   } catch (error) {
+    if (isQuotaError(error)) markQuotaExceeded(error);
     console.error('[quiz-report] AI generation failed:', error);
     res.json({ report: buildLocalQuizReport(sessionLog) });
   }

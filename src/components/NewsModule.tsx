@@ -1,8 +1,28 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Newspaper, Globe, ExternalLink, RefreshCw } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { fetchNewsTopics, type NewsCategory } from '../services/apiClient';
+import { ApiError, fetchNewsTopics, type NewsCategory } from '../services/apiClient';
 import { toLocalDateKey } from '../../shared/date';
+
+// 失敗の原因に合わせて、利用者に伝えるメッセージを選ぶ。
+function newsErrorMessage(error: unknown) {
+  if (error instanceof ApiError) {
+    if (error.code === 'quota_exceeded') {
+      const minutes = error.retryAfterSec ? Math.max(1, Math.ceil(error.retryAfterSec / 60)) : null;
+      return `AI の利用上限に達しているため、ニュースを取得できません。${minutes ? `約${minutes}分後に` : 'しばらくしてから'}再度お試しください。`;
+    }
+    if (error.code === 'gemini_not_configured') {
+      return 'ニュース機能が設定されていません（サーバーの GEMINI_API_KEY が未設定です）。';
+    }
+    if (error.status >= 500 && error.code === null) {
+      return 'API サーバーに接続できません。サーバー（npm run dev:api）が起動しているか確認してください。';
+    }
+  }
+  if (error instanceof TypeError) {
+    return 'ネットワークに接続できないため、ニュースを取得できません。接続を確認してください。';
+  }
+  return 'ニュースの取得に失敗しました。時間をおいて再度お試しください。';
+}
 
 export const NewsModule = () => {
   // UI に表示するカテゴリ別ニュースカード。
@@ -38,12 +58,18 @@ export const NewsModule = () => {
     setFetchError(null);
     try {
       // サーバー経由で最新カテゴリニュースを取得。
-      const categories = await fetchNewsTopics(force);
+      const { categories, source } = await fetchNewsTopics(force);
       if (categories.length > 0) {
-        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         setDisplayNews(categories);
+        if (source === 'stale') {
+          // 今日の分は取得できず、以前の結果が返ってきた。今日のキャッシュにはせず、次回また取得を試みる。
+          setLastUpdated('以前の取得結果');
+          setFetchError('現在ニュースを更新できないため、以前に取得したニュースを表示しています。');
+          return;
+        }
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         setLastUpdated(timeStr);
-        
+
         // 日付が変わるまでキャッシュとして保持。
         localStorage.setItem('biz_daily_news', JSON.stringify(categories));
         localStorage.setItem('biz_daily_news_date', today);
@@ -53,9 +79,7 @@ export const NewsModule = () => {
       }
     } catch (error) {
       console.error("Failed to fetch news topics:", error);
-      setFetchError(
-        '最新ニュースの取得に失敗しました。API サーバー（npm run dev:api）と GEMINI_API_KEY の設定を確認してください。'
-      );
+      setFetchError(newsErrorMessage(error));
     } finally {
       setIsRefreshing(false);
     }
@@ -85,10 +109,16 @@ export const NewsModule = () => {
             <RefreshCw size={18} className={cn(isRefreshing && "animate-spin")} />
           </button>
           <span className="text-xs text-gray-500 bg-white px-3 py-1 rounded-full border border-gray-100 shadow-sm">
-            最終更新: {lastUpdated || "取得中..."}
+            最終更新: {lastUpdated || (isRefreshing ? "取得中..." : "未取得")}
           </span>
         </div>
       </div>
+
+      {fetchError && (
+        <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {fetchError}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {displayNews.length > 0 ? (
@@ -132,7 +162,7 @@ export const NewsModule = () => {
           ))
         ) : (
           <div className="col-span-full py-12 text-center text-gray-400 italic">
-            ニュースを読み込めませんでした。更新ボタンを押してください。
+            {fetchError ? 'ニュースはまだありません。' : 'ニュースを読み込めませんでした。更新ボタンを押してください。'}
           </div>
         )}
       </div>
