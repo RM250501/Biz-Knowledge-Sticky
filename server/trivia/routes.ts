@@ -10,6 +10,7 @@ import {
 } from './generator';
 import type { Trivia } from './types';
 import { toLocalDateKey } from '../../shared/date';
+import { hasGeminiKey, isQuotaError, markQuotaExceeded, quotaCooldownRemainingMs } from '../gemini';
 
 const RETENTION_DAYS = 45;
 const MAX_ATTEMPTS = 5;
@@ -45,7 +46,9 @@ async function assignNewTrivia(browserId: string, dateKey: string, refresh: bool
   const variantIndex = hashString(`${dateKey}-${browserId}`) % THEME_COUNT;
 
   let assigned: Trivia | null = null;
-  for (let attempt = 0; attempt < MAX_ATTEMPTS && !assigned; attempt += 1) {
+  // キー未設定・利用枠超過のクールダウン中は、AI を呼ばずにフォールバックの雑学を使う。
+  const canUseAI = hasGeminiKey() && quotaCooldownRemainingMs() === 0;
+  for (let attempt = 0; canUseAI && attempt < MAX_ATTEMPTS && !assigned; attempt += 1) {
     try {
       const aiTrivia = await generateAITrivia(dateKey, browserId, usedTitles, variantIndex, attempt);
       const normalizedTitle = normalizeTitle(aiTrivia?.title || '');
@@ -54,8 +57,13 @@ async function assignNewTrivia(browserId: string, dateKey: string, refresh: bool
       const candidate = sanitizeTrivia(aiTrivia, dateKey, `${browserId.slice(-6)}-${attempt}`);
       const factCheck = await verifyAITrivia(candidate);
       if (factCheck.approved) assigned = candidate;
-    } catch {
-      // 別のテーマで再試行する。
+    } catch (error) {
+      // 利用枠超過は何度試しても同じなので、すぐにやめてフォールバックに切り替える。
+      if (isQuotaError(error)) {
+        markQuotaExceeded(error);
+        break;
+      }
+      // それ以外は別のテーマで再試行する。
     }
   }
 

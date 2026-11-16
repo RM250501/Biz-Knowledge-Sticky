@@ -27,3 +27,46 @@ export function getGenAI() {
   }
   return client;
 }
+
+// --- 利用枠超過（429）への対応 ---
+// 枠を超えている間に呼び続けると、回復した枠をすぐまた使い切ってしまう。
+// 429 を受けたら一定時間（クールダウン）は、ニュース・雑学・レポートのどれも Gemini を呼ばない。
+
+const DEFAULT_QUOTA_COOLDOWN_MS = 10 * 60 * 1000;
+const MIN_QUOTA_COOLDOWN_MS = 60 * 1000;
+
+let quotaCooldownUntil = 0;
+
+function errorText(error: unknown) {
+  if (error instanceof Error) return error.message;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
+export function isQuotaError(error: unknown) {
+  const status = (error as { status?: unknown } | null)?.status;
+  if (status === 429) return true;
+  return /\b429\b|RESOURCE_EXHAUSTED/.test(errorText(error));
+}
+
+// 429 を記録し、クールダウンを始める。API が retryDelay（例: "37s"）を返していればそれに従う。
+export function markQuotaExceeded(error: unknown) {
+  const match = errorText(error).match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/);
+  const retryMs = match ? Number(match[1]) * 1000 : DEFAULT_QUOTA_COOLDOWN_MS;
+  const until = Date.now() + Math.max(retryMs, MIN_QUOTA_COOLDOWN_MS);
+  quotaCooldownUntil = Math.max(quotaCooldownUntil, until);
+  console.warn(`[gemini] quota exceeded; pausing AI calls until ${new Date(quotaCooldownUntil).toISOString()}`);
+}
+
+// クールダウン中なら、残りミリ秒を返す。中でなければ 0。
+export function quotaCooldownRemainingMs() {
+  return Math.max(0, quotaCooldownUntil - Date.now());
+}
+
+// テスト用: クールダウンを解除する。
+export function resetQuotaCooldown() {
+  quotaCooldownUntil = 0;
+}

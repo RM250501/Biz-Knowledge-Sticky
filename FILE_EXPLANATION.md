@@ -286,6 +286,7 @@
 
 ### server/gemini.ts
 - Gemini クライアントの生成と、使用モデルの決定（環境変数 `GEMINI_MODEL`、既定値 `gemini-3.6-flash`）。`GEMINI_API_KEY` はここでだけ読む。
+- 利用枠超過（429）を受けたら、一定時間（API の retryDelay、なければ10分）はニュース・雑学・レポートのどれも Gemini を呼ばない（`markQuotaExceeded`、`quotaCooldownRemainingMs`）。
 
 ### server/trivia/
 - `routes.ts`: 日替わり雑学の割り当て（同日同ブラウザは同じネタ、別ブラウザには別のネタ）。
