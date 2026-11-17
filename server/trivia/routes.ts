@@ -5,6 +5,7 @@ import {
   buildFallbackTrivia,
   generateAITrivia,
   hashString,
+  normalizeTitle,
   sanitizeTrivia,
   verifyAITrivia,
 } from './generator';
@@ -13,16 +14,13 @@ import { toLocalDateKey } from '../../shared/date';
 import { hasGeminiKey, isQuotaError, markQuotaExceeded, quotaCooldownRemainingMs } from '../gemini';
 
 const RETENTION_DAYS = 45;
-const MAX_ATTEMPTS = 5;
+// 「生成 → 事実確認」を試す回数。両方失敗したら固定の雑学を使う。
+const MAX_ATTEMPTS = 2;
 
 type AssignmentResult = {
   status: number;
   body: Record<string, unknown>;
 };
-
-function normalizeTitle(input: string) {
-  return (input || '').trim().replace(/\s+/g, '');
-}
 
 function parseDateKey(value: unknown) {
   const text = String(value || '');
@@ -67,7 +65,7 @@ async function assignNewTrivia(browserId: string, dateKey: string, refresh: bool
     }
   }
 
-  const trivia = assigned ?? buildFallbackTrivia(dateKey, browserId);
+  const trivia = assigned ?? buildFallbackTrivia(dateKey, browserId, usedTitles);
   await insertAssignment(trivia, browserId);
 
   const cutoff = new Date(dateKey);

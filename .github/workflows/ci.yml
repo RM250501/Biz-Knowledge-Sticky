@@ -44,5 +44,8 @@ jobs:
       - name: ニュース RSS の読み取りのチェック
         run: npm run check:news
 
+      - name: 固定の雑学のチェック
+        run: npm run check:trivia
+
       - name: 本番ビルド
         run: npm run build
