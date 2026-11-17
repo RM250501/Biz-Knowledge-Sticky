@@ -194,9 +194,9 @@
 ### src/components/NewsModule.tsx
 - 最新ニュース一覧表示。
 - `fetchNews(force = false)`:
-  - 当日のキャッシュがあれば localStorage から復元
-  - ない場合 `fetchNewsTopics()` で API サーバー (`/api/news`) から取得
-  - 取得結果を localStorage へ保存
+  - API サーバー (`/api/news`) から取得する（サーバー側で30分キャッシュ）。`force` は「最新情報を取得」ボタン
+  - 取得結果を localStorage (`biz_news_cache_v2`) に保存し、API サーバーに届かないときはそれを表示する
+  - 取得元に接続できず以前の結果が返ってきたときは、その日時を案内する
 - `lastUpdated`:
   最終更新時刻を表示。
 - UI:
@@ -293,7 +293,7 @@
 
 ### server/gemini.ts
 - Gemini クライアントの生成と、使用モデルの決定（環境変数 `GEMINI_MODEL`、既定値 `gemini-3.6-flash`）。`GEMINI_API_KEY` はここでだけ読む。
-- 利用枠超過（429）を受けたら、一定時間（API の retryDelay、なければ10分）はニュース・雑学・レポートのどれも Gemini を呼ばない（`markQuotaExceeded`、`quotaCooldownRemainingMs`）。
+- 利用枠超過（429）を受けたら、一定時間（API の retryDelay、なければ10分）は雑学・レポートのどちらも Gemini を呼ばない（`markQuotaExceeded`、`quotaCooldownRemainingMs`）。
 
 ### server/trivia/
 - `routes.ts`: 日替わり雑学の割り当て（同日同ブラウザは同じネタ、別ブラウザには別のネタ）。
@@ -301,7 +301,12 @@
 - `db.ts`: sql.js（SQLite）での割り当て保存。`.data/trivia.db` に書き出す（初回起動時に自動作成。Git の管理対象外）。
 
 ### server/routes/
-- `news.ts`: Google 検索連携で最新ニュースを取得。同じ日はメモリにキャッシュする。
+- `news.ts`: ニュース一覧の API。30分キャッシュし、取得元に接続できないときは前回の結果を返す。
+
+### server/news/
+- `feeds.ts`: ニュースの取得元（RSS）とカテゴリの設定。取得元を変えるときはここだけを編集する。
+- `rss.ts`: RSS 2.0 / RSS 1.0（RDF）/ Atom から見出し・リンク・日時を読み取る。http(s) 以外のリンクは除く。
+- `aggregator.ts`: 取得元をまとめて取得し、新しい順・重複なしで各カテゴリ3件にする。最後の結果を `.data/news-cache.json` に保存する。
 - `quizReport.ts`: クイズ結果の総括とコメントを AI で作る。キー未設定・失敗時はローカル集計を返す。
 
 ## shared
@@ -313,7 +318,8 @@
 
 - `validateQuestions.ts`: 問題データの ID 重複、選択肢数、正解番号、空欄などを検査する。
 - `checkStats.ts`: カテゴリ別正答率（`src/lib/categoryStats.ts`）の計算を確認する。`npm run check:stats` で実行。
-- `checkGemini.ts`: Gemini API に実際に接続し、モデルの存在・構造化出力・Google 検索連携を確認する。API キーが必要なので CI では実行しない。`npm run check:gemini` で実行。
+- `checkNews.ts`: ニュース RSS の読み取りとまとめ方をサンプルで確認する（CI で実行）。`--live` を付けると取得元に実際に接続する。`npm run check:news` で実行。
+- `checkGemini.ts`: Gemini API に実際に接続し、モデルの存在と構造化出力を確認する。API キーが必要なので CI では実行しない。`npm run check:gemini` で実行。
 - `checkStreak.ts`: 連続ログイン日数（`nextLoginStreak`）、日数差（`diffInDays`）、日付キー（`toLocalDateKey`）の計算を確認する。実行環境に左右されないよう、日数差は米国東部時間（夏時間の切り替えあり）、日付キーは日本時間に固定して検証する。`npm run check:streak` で実行。
 
 ## 補足

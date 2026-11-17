@@ -8,7 +8,7 @@ Biz-Knowledge Sticky は、ビジネス一般常識を日々の習慣として�
 - 一般常識ドリル: 6 カテゴリ × 40 問（計 240 問）の 4 択クイズ、時間制 / 出題数制に対応
 - 雑学ネタ帳: 1 ブラウザ 1 日 1 件の雑学を配布し、反応とメモを保存
 - お天気情報: 現在地または地域指定で、現在天気と予報を表示
-- 最新トピックス: Gemini API と Google Search で最新ニュースを収集
+- 最新トピックス: ニュースサイトの RSS から最新の見出しを取得（30分ごとに更新。取得元は `server/news/feeds.ts`）
 
 ## 画面構成
 
@@ -55,6 +55,8 @@ Biz-Knowledge Sticky は、ビジネス一般常識を日々の習慣として�
 
 4. 別ターミナルで API サーバーを起動する（雑学・ニュース・クイズレポート）
 
+   本番に近い形で1つのターミナルで動かす場合は `npm run serve:prod`（ビルドして http://localhost:8787 で配信）
+
    npm run dev:api
 
 5. ブラウザでアクセスする
@@ -73,7 +75,8 @@ Biz-Knowledge Sticky は、ビジネス一般常識を日々の習慣として�
 - `npm run check:questions`: クイズ問題データの形式チェック
 - `npm run check:streak`: 連続ログイン日数の計算チェック
 - `npm run check:stats`: カテゴリ別正答率の計算チェック
-- `npm run check:gemini`: Gemini API に実際に接続し、モデル・構造化出力・Google 検索連携が使えるか確認（API キーが必要）
+- `npm run check:news`: ニュース（RSS）の読み取りとまとめ方のチェック。`npm run check:news -- --live` で取得元に実際に接続して確認
+- `npm run check:gemini`: Gemini API に実際に接続し、モデルと構造化出力が使えるか確認（API キーが必要）
 - `npm run clean`: `dist` を削除
 
 ## CI
@@ -84,6 +87,7 @@ GitHub Actions（`.github/workflows/ci.yml`）で、PR ごとと main への pus
 - `npm run check:questions`（クイズ問題データのチェック）
 - `npm run check:streak`（連続ログイン日数・日付計算のチェック）
 - `npm run check:stats`（カテゴリ別正答率のチェック）
+- `npm run check:news`（ニュース RSS の読み取りのチェック。ネットワークは使わない）
 - `npm run build`（本番ビルド）
 
 ## 環境変数

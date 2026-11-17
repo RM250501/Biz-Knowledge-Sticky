@@ -41,5 +41,8 @@ jobs:
       - name: カテゴリ別正答率のチェック
         run: npm run check:stats
 
+      - name: ニュース RSS の読み取りのチェック
+        run: npm run check:news
+
       - name: 本番ビルド
         run: npm run build

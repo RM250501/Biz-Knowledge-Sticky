@@ -1,5 +1,6 @@
 // Gemini API の接続チェック。`npm run check:gemini` で実行する（API キーが必要）。
-// アプリと同じ設定（GEMINI_MODEL、構造化出力、Google 検索連携）で実際に呼び、使えるかを確かめる。
+// アプリと同じ設定（GEMINI_MODEL、構造化出力）で実際に呼び、使えるかを確かめる。
+// ニュースは RSS から取得するので、ここでは確認しない（`npm run check:news -- --live`）。
 // モデルの提供終了やキーの不備に、本番で気づく前に気づくためのもの。CI では実行しない。
 import dotenv from 'dotenv';
 import { getGeminiModel, getGenAI, hasGeminiKey } from '../server/gemini';
@@ -64,29 +65,6 @@ async function main() {
     return parsed.answer;
   }));
 
-  // ニュース取得と同じ、Google 検索連携 + 構造化出力。
-  results.push(await step('Google 検索連携 + 構造化出力（ニュース取得と同じ設定）', async () => {
-    const response = await ai.models.generateContent({
-      model,
-      contents: '今日の日本の主要ニュースを1件、実在する記事の URL 付きで挙げてください。',
-      config: {
-        tools: [{ googleSearch: {} }],
-        toolConfig: { includeServerSideToolInvocations: true },
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: 'OBJECT',
-          properties: { title: { type: 'STRING' }, url: { type: 'STRING' } },
-          required: ['title', 'url'],
-        },
-      },
-    });
-    const parsed = JSON.parse(response.text || '{}');
-    if (typeof parsed.url !== 'string' || !/^https?:\/\//.test(parsed.url)) {
-      throw new Error(`URL を含む応答が得られませんでした: ${response.text}`);
-    }
-    return parsed.title;
-  }));
-
   const failed = results.filter((r) => r !== 'ok').length;
   if (failed > 0) {
     console.error(`\n${failed} 件失敗しました。`);
@@ -95,8 +73,7 @@ async function main() {
     }
     if (results.includes('quota')) {
       console.error('- API キーの利用枠を超えています（429）。モデル名を変えても直りません。');
-      console.error('  https://ai.dev/rate-limit で上限と使用量を確認してください。Google 検索連携は無料枠で使えない場合があり、');
-      console.error('  その場合は Google AI Studio でキーのプロジェクトに支払い方法の設定が必要です。');
+      console.error('  https://ai.dev/rate-limit で上限と使用量を確認してください。');
     }
     if (results.includes('error')) {
       console.error('- 上のエラー内容を確認してください（キーの権限、ネットワークなど）。');

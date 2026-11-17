@@ -2,84 +2,80 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Newspaper, Globe, ExternalLink, RefreshCw } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { ApiError, fetchNewsTopics, type NewsCategory } from '../services/apiClient';
-import { toLocalDateKey } from '../../shared/date';
+
+// 最後に表示できたニュース。API サーバーに届かないときの予備として、このブラウザに残す。
+const NEWS_CACHE_KEY = 'biz_news_cache_v2';
+const LEGACY_KEYS = ['biz_daily_news', 'biz_daily_news_date', 'biz_daily_news_time'];
+
+type SavedNews = { fetchedAt: number; categories: NewsCategory[] };
+
+function formatDateTime(ms: number) {
+  return new Date(ms).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function readSavedNews(): SavedNews | null {
+  try {
+    const data = JSON.parse(localStorage.getItem(NEWS_CACHE_KEY) || 'null');
+    return typeof data?.fetchedAt === 'number' && Array.isArray(data?.categories) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSavedNews(data: SavedNews) {
+  try {
+    localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(data));
+    LEGACY_KEYS.forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // 保存できなくても表示には影響しない
+  }
+}
 
 // 失敗の原因に合わせて、利用者に伝えるメッセージを選ぶ。
 function newsErrorMessage(error: unknown) {
-  if (error instanceof ApiError) {
-    if (error.code === 'quota_exceeded') {
-      const minutes = error.retryAfterSec ? Math.max(1, Math.ceil(error.retryAfterSec / 60)) : null;
-      return `AI の利用上限に達しているため、ニュースを取得できません。${minutes ? `約${minutes}分後に` : 'しばらくしてから'}再度お試しください。`;
-    }
-    if (error.code === 'gemini_not_configured') {
-      return 'ニュース機能が設定されていません（サーバーの GEMINI_API_KEY が未設定です）。';
-    }
-    if (error.status >= 500 && error.code === null) {
-      return 'API サーバーに接続できません。サーバー（npm run dev:api）が起動しているか確認してください。';
-    }
+  if (error instanceof ApiError && error.status >= 500 && error.code === null) {
+    return 'API サーバーに接続できません。サーバー（npm run dev:api）が起動しているか確認してください。';
   }
   if (error instanceof TypeError) {
     return 'ネットワークに接続できないため、ニュースを取得できません。接続を確認してください。';
   }
-  return 'ニュースの取得に失敗しました。時間をおいて再度お試しください。';
+  return 'ニュースの取得元に接続できませんでした。時間をおいて再度お試しください。';
 }
 
 export const NewsModule = () => {
   // UI に表示するカテゴリ別ニュースカード。
   const [displayNews, setDisplayNews] = useState<NewsCategory[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  // ニュース取得エラーメッセージ（再試行の促し）
+  // 取得できなかったときの案内
   const [fetchError, setFetchError] = useState<string | null>(null);
-  // 画面表示用の最終更新時刻。
+  // 表示中のニュースを取得した日時
   const [lastUpdated, setLastUpdated] = useState<string>("");
 
   const fetchNews = useCallback(async (force = false) => {
-    // キャッシュは日付単位で管理する。
-    const today = toLocalDateKey();
-    const savedNews = localStorage.getItem('biz_daily_news');
-    const savedDate = localStorage.getItem('biz_daily_news_date');
-
-    if (!force && savedNews && savedDate === today) {
-      try {
-        // 同日内の再取得を避けるためローカルキャッシュを再利用。
-        setDisplayNews(JSON.parse(savedNews));
-        setLastUpdated(localStorage.getItem('biz_daily_news_time') || "");
-        setFetchError(null);
-        return;
-      } catch (e) {
-        console.error("Failed to parse saved news:", e);
-        // 破損キャッシュは削除
-        localStorage.removeItem('biz_daily_news');
-        localStorage.removeItem('biz_daily_news_date');
-      }
-    }
-
     setIsRefreshing(true);
     setFetchError(null);
     try {
-      // サーバー経由で最新カテゴリニュースを取得。
-      const { categories, source } = await fetchNewsTopics(force);
-      if (categories.length > 0) {
-        setDisplayNews(categories);
-        if (source === 'stale') {
-          // 今日の分は取得できず、以前の結果が返ってきた。今日のキャッシュにはせず、次回また取得を試みる。
-          setLastUpdated('以前の取得結果');
-          setFetchError('現在ニュースを更新できないため、以前に取得したニュースを表示しています。');
-          return;
-        }
-        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        setLastUpdated(timeStr);
-
-        // 日付が変わるまでキャッシュとして保持。
-        localStorage.setItem('biz_daily_news', JSON.stringify(categories));
-        localStorage.setItem('biz_daily_news_date', today);
-        localStorage.setItem('biz_daily_news_time', timeStr);
-      } else {
-        throw new Error("Invalid news data received");
+      // サーバーが RSS から取得し、30分ごとに更新したものを受け取る。
+      const { categories, source, fetchedAt } = await fetchNewsTopics(force);
+      if (categories.length === 0) throw new Error('No news received');
+      const at = fetchedAt ?? Date.now();
+      setDisplayNews(categories);
+      setLastUpdated(formatDateTime(at));
+      writeSavedNews({ fetchedAt: at, categories });
+      if (source === 'stale') {
+        setFetchError(`ニュースの取得元に接続できないため、${formatDateTime(at)} 時点のニュースを表示しています。`);
       }
     } catch (error) {
       console.error("Failed to fetch news topics:", error);
-      setFetchError(newsErrorMessage(error));
+      const saved = readSavedNews();
+      if (saved) {
+        // API サーバーに届かないときは、このブラウザに残っている前回のニュースを表示する。
+        setDisplayNews(saved.categories);
+        setLastUpdated(formatDateTime(saved.fetchedAt));
+        setFetchError(`${newsErrorMessage(error)}（${formatDateTime(saved.fetchedAt)} 時点のニュースを表示しています）`);
+      } else {
+        setFetchError(newsErrorMessage(error));
+      }
     } finally {
       setIsRefreshing(false);
     }
@@ -141,7 +137,10 @@ export const NewsModule = () => {
                       {art.title}
                     </a>
                     <div className="flex items-center justify-between text-[10px] text-gray-400">
-                      <span className="font-bold uppercase">{art.source}</span>
+                      <span className="font-bold uppercase">
+                        {art.source}
+                        {art.publishedAt && <span className="font-normal ml-2">{formatDateTime(Date.parse(art.publishedAt))}</span>}
+                      </span>
                       <ExternalLink size={10} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                     </div>
                   </div>

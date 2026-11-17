@@ -30,7 +30,7 @@ export function getGenAI() {
 
 // --- 利用枠超過（429）への対応 ---
 // 枠を超えている間に呼び続けると、回復した枠をすぐまた使い切ってしまう。
-// 429 を受けたら一定時間（クールダウン）は、ニュース・雑学・レポートのどれも Gemini を呼ばない。
+// 429 を受けたら一定時間（クールダウン）は、雑学・レポートのどちらも Gemini を呼ばない。
 
 const DEFAULT_QUOTA_COOLDOWN_MS = 10 * 60 * 1000;
 const MIN_QUOTA_COOLDOWN_MS = 60 * 1000;

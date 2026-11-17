@@ -3,7 +3,7 @@ import type { QuizReport, QuizSessionLogItem } from '../../shared/quizReport';
 // Gemini を使う処理はすべてサーバー（server/）経由で呼び出す。
 // API キーはブラウザに渡さない。
 
-export type NewsArticle = { title: string; source: string; url: string };
+export type NewsArticle = { title: string; source: string; url: string; publishedAt?: string | null };
 export type NewsCategory = { id: string; name: string; articles: NewsArticle[] };
 
 // API のエラー。code はサーバーが返したエラー種別（例: quota_exceeded）。
@@ -37,8 +37,9 @@ async function readJson(response: Response) {
   return response.json();
 }
 
-// source: 'new' / 'cached' = 今日の取得結果、'stale' = 取得できなかったため以前の結果を返したもの。
-export type NewsResult = { categories: NewsCategory[]; source: 'new' | 'cached' | 'stale' };
+// source: 'new' / 'cached' = 最新の取得結果、'stale' = 取得元に接続できず以前の結果を返したもの。
+// fetchedAt: サーバーがニュースを取得した時刻（ミリ秒）。
+export type NewsResult = { categories: NewsCategory[]; source: 'new' | 'cached' | 'stale'; fetchedAt: number | null };
 
 export async function fetchNewsTopics(force = false): Promise<NewsResult> {
   const response = await fetch(`/api/news${force ? '?refresh=1' : ''}`, {
@@ -47,7 +48,8 @@ export async function fetchNewsTopics(force = false): Promise<NewsResult> {
   const data = await readJson(response);
   if (!Array.isArray(data?.categories)) throw new Error('Invalid news data received');
   const source = data.source === 'stale' || data.source === 'cached' ? data.source : 'new';
-  return { categories: data.categories as NewsCategory[], source };
+  const fetchedAt = typeof data.fetchedAt === 'number' ? data.fetchedAt : null;
+  return { categories: data.categories as NewsCategory[], source, fetchedAt };
 }
 
 export async function requestQuizReport(sessionLog: QuizSessionLogItem[]): Promise<QuizReport> {
