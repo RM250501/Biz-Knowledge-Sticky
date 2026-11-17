@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { getGeminiModel, getGenAI } from '../gemini';
 import type { Trivia } from './types';
+import { FALLBACK_TRIVIA } from './fallback';
 
 const THEMES = [
   '数字の意外性',
@@ -19,41 +20,6 @@ const THEMES = [
 
 export const THEME_COUNT = THEMES.length;
 
-const FALLBACK_TRIVIA: Array<Omit<Trivia, 'id' | 'date'>> = [
-  {
-    category: '雑学',
-    title: '富士山は日本最高峰',
-    explanation: '富士山は日本でいちばん高い山として知られています。標高は 3776m です。',
-    doyaPoint: '日本一の高さは、会話の切り出しに使いやすい定番ネタです。',
-    starter: 'そういえば、日本でいちばん高い山って知ってる？',
-    target: ['同僚', '友人'],
-  },
-  {
-    category: '雑学',
-    title: '1日は24時間',
-    explanation: '地球の自転により、私たちは 1 日を 24 時間として区切って生活しています。',
-    doyaPoint: '当たり前に見えて、時間の基準は地球の動きに支えられています。',
-    starter: '時間の区切りって、どうして 24 時間なんだろう？',
-    target: ['同僚', '友人'],
-  },
-  {
-    category: '雑学',
-    title: '紙は折ると強くなる',
-    explanation: '紙は薄くても、折り方や重ね方を工夫すると見た目以上の強さを出せます。',
-    doyaPoint: '身近な素材でも、形を変えるだけで性質が変わります。',
-    starter: '紙って、ただの紙でも結構すごいんだよ。',
-    target: ['同僚', '友人'],
-  },
-  {
-    category: '雑学',
-    title: '月は地球の衛星',
-    explanation: '月は地球の周りを回る唯一の自然衛星です。夜空で最も身近な天体のひとつです。',
-    doyaPoint: '天体の基本ネタは、幅広い相手に話しやすいのが強みです。',
-    starter: '月って、実は地球の衛星なんだよね。',
-    target: ['同僚', '友人'],
-  },
-];
-
 export function hashString(input: string) {
   let hash = 0;
   for (let i = 0; i < input.length; i += 1) {
@@ -62,8 +28,23 @@ export function hashString(input: string) {
   return hash;
 }
 
-export function buildFallbackTrivia(dateKey: string, browserId: string): Trivia {
-  const index = hashString(`${dateKey}-${browserId}`) % FALLBACK_TRIVIA.length;
+// タイトルの比較用に空白を取り除く。
+export function normalizeTitle(input: string) {
+  return (input || '').trim().replace(/\s+/g, '');
+}
+
+// 固定の雑学から1件選ぶ。日付とブラウザで選ぶ位置を決め、同じ日に配った雑学とは重ならないようにする。
+export function buildFallbackTrivia(dateKey: string, browserId: string, usedTitles: Iterable<string> = []): Trivia {
+  const used = new Set(Array.from(usedTitles, normalizeTitle));
+  const start = hashString(`${dateKey}-${browserId}`) % FALLBACK_TRIVIA.length;
+  let index = start;
+  for (let i = 0; i < FALLBACK_TRIVIA.length; i += 1) {
+    const candidate = (start + i) % FALLBACK_TRIVIA.length;
+    if (!used.has(normalizeTitle(FALLBACK_TRIVIA[candidate].title))) {
+      index = candidate;
+      break;
+    }
+  }
   return {
     id: `fallback-${dateKey}-${browserId.slice(-8)}-${index}-${randomUUID()}`,
     date: dateKey,
@@ -127,7 +108,7 @@ export async function generateAITrivia(
 
 # 制約事項
 - 必ず日本語で出力すること。
-- 断定が難しい固有名詞・年代・由来は避けること。
+- 諸説が分かれる話や、真偽のはっきりしない話は避けること。
 - 出力は指定されたJSONのオブジェクト1つのみとし、ValidなJSONにすること。
 `;
 
@@ -158,12 +139,13 @@ export async function generateAITrivia(
 export async function verifyAITrivia(trivia: Trivia) {
   const ai = getGenAI();
   const prompt = `
-あなたは事実確認担当です。次の雑学に含まれる内容が、一般的に広く知られている事実だけで構成されているかを判定してください。
+あなたは事実確認担当です。次の雑学を、会話のネタとして紹介してよいかを判定してください。
 
 判定基準:
-- 断定が難しい固有名詞、年代、語源、由来、数値が含まれていれば不承認
-- 曖昧さが少しでもある場合は不承認
-- 雑学として面白くても、真偽に自信がないなら不承認
+- 辞書・教科書・公的機関などで一般に確認できる内容なら承認する（数値や由来を含んでいてもよい）
+- 細部に諸説がある程度で、話の中心が正しければ承認する
+- 明らかな誤り、都市伝説、根拠のはっきりしない俗説が話の中心なら不承認にする
+- 下品・差別的・政治的・宗教的な内容は不承認にする
 
 雑学:
 タイトル: ${trivia.title}

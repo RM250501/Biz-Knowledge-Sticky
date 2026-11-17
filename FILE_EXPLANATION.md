@@ -297,7 +297,8 @@
 
 ### server/trivia/
 - `routes.ts`: 日替わり雑学の割り当て（同日同ブラウザは同じネタ、別ブラウザには別のネタ）。
-- `generator.ts`: 雑学の AI 生成、別の AI 呼び出しによる事実確認、フォールバックデータ。
+- `generator.ts`: 雑学の AI 生成と、別の AI 呼び出しによる事実確認（明らかな誤りや俗説を不承認にする）。生成と事実確認は最大2回まで試す。
+- `fallback.ts`: AI で作れなかったときに使う固定の雑学（40件）。同じ日に配った雑学とは重ならないように選ぶ。
 - `db.ts`: sql.js（SQLite）での割り当て保存。`.data/trivia.db` に書き出す（初回起動時に自動作成。Git の管理対象外）。
 
 ### server/routes/
@@ -319,6 +320,7 @@
 - `validateQuestions.ts`: 問題データの ID 重複、選択肢数、正解番号、空欄などを検査する。
 - `checkStats.ts`: カテゴリ別正答率（`src/lib/categoryStats.ts`）の計算を確認する。`npm run check:stats` で実行。
 - `checkNews.ts`: ニュース RSS の読み取りとまとめ方をサンプルで確認する（CI で実行）。`--live` を付けると取得元に実際に接続する。`npm run check:news` で実行。
+- `checkTrivia.ts`: 固定の雑学の件数・重複・各項目の長さと、同じ日に配るときに重ならないことを確認する。`npm run check:trivia` で実行。
 - `checkGemini.ts`: Gemini API に実際に接続し、モデルの存在と構造化出力を確認する。API キーが必要なので CI では実行しない。`npm run check:gemini` で実行。
 - `checkStreak.ts`: 連続ログイン日数（`nextLoginStreak`）、日数差（`diffInDays`）、日付キー（`toLocalDateKey`）の計算を確認する。実行環境に左右されないよう、日数差は米国東部時間（夏時間の切り替えあり）、日付キーは日本時間に固定して検証する。`npm run check:streak` で実行。
 
